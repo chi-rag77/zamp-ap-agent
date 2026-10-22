@@ -18,7 +18,9 @@ export class NvidiaVisionProvider implements VisionModelProvider {
       content.push({type:'text',text:`Page ${page.pageNumber} of ${input.pages.length}`});
       content.push({type:'image_url',image_url:{url:`data:${page.mimeType};base64,${page.bytes.toString('base64')}`}});
     }
-    const body:Record<string,unknown>={model:this.config.model,messages:[{role:'system',content:SYSTEM_PROMPT},{role:'user',content}],temperature:0,stream:false};
+    const body:Record<string,unknown>={model:this.config.model,messages:[{role:'system',content:SYSTEM_PROMPT},{role:'user',content}],temperature:0,max_tokens:this.config.maxOutputTokens,stream:false};
+    // Nano Omni emits reasoning in `content` unless disabled; extraction needs only JSON.
+    if(this.config.model==='nvidia/nemotron-3-nano-omni-30b-a3b-reasoning')body.chat_template_kwargs={enable_thinking:false};
     if(this.config.jsonMode)body.response_format={type:'json_object'};
     let lastError:ExtractionError|undefined;
     const start=Date.now();
@@ -32,6 +34,10 @@ export class NvidiaVisionProvider implements VisionModelProvider {
       }
       let parsed:unknown;
       try{parsed=JSON.parse(raw.replace(/^```(?:json)?\s*|\s*```$/g,''))}catch{lastError=new ExtractionError('EXTRACTION_JSON_INVALID','Model output was not valid JSON',raw);continue}
+      // A non-invoice is a classification result; discard any PO-like fields the model added.
+      if(parsed&&typeof parsed==='object'&&'documentType' in parsed&&parsed.documentType==='NOT_INVOICE'){
+        return {extraction:ExtractedInvoiceSchema.parse({documentType:'NOT_INVOICE'}),rawResponse:raw,model:this.config.model,provider:'NVIDIA_NIM',finishReason:choice.finish_reason,usage:response.usage,latencyMs:Date.now()-start};
+      }
       const validated=ExtractedInvoiceSchema.safeParse(parsed);
       if(!validated.success){lastError=new ExtractionError('EXTRACTION_SCHEMA_INVALID','Model output did not match the invoice schema',raw);continue}
       return {extraction:validated.data,rawResponse:raw,model:this.config.model,provider:'NVIDIA_NIM',finishReason:choice.finish_reason,usage:response.usage,latencyMs:Date.now()-start};

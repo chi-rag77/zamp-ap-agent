@@ -18,14 +18,15 @@
     "db:seed": "node scripts/reset-demo.mjs",
     "extract:invoice": "tsx scripts/extract-invoice.ts",
     "smoke:live": "tsx scripts/smoke-live.ts",
-    "dev": "node --env-file-if-exists=.env.local node_modules/next/dist/bin/next dev apps/web"
+    "dev": "WATCHPACK_POLLING=true node scripts/next-with-env.mjs dev apps/web --webpack",
+    "start": "node scripts/next-with-env.mjs start apps/web"
   },
   "dependencies": {
     "@supabase/supabase-js": "2.76.1",
-    "next": "15.5.28",
+    "next": "16.4.2",
     "react": "19.1.1",
     "react-dom": "19.1.1",
-    "sharp": "0.34.5",
+    "sharp": "0.35.5",
     "zod": "4.1.11"
   },
   "devDependencies": {
@@ -35,7 +36,7 @@
     "eslint": "9.36.0",
     "tsx": "4.21.0",
     "typescript": "5.9.2",
-    "typescript-eslint": "8.44.1",
-    "vitest": "3.2.4"
+    "typescript-eslint": "8.72.0",
+    "vitest": "5.0.5"
   }
 }

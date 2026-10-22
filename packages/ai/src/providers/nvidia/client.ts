@@ -1,11 +1,13 @@
 import { ExtractionError } from './errors';
 
-export type NvidiaConfig={apiKey:string;baseUrl:string;model:string;timeoutMs:number;maxAttempts:number;jsonMode:boolean};
+export type NvidiaConfig={apiKey:string;baseUrl:string;model:string;timeoutMs:number;maxAttempts:number;maxOutputTokens:number;jsonMode:boolean};
 export function nvidiaConfig(env:NodeJS.ProcessEnv=process.env):NvidiaConfig{
   if(!env.NVIDIA_API_KEY||!env.NVIDIA_MODEL)throw new Error('NVIDIA_API_KEY and NVIDIA_MODEL are required in real mode');
   const baseUrl=env.NVIDIA_BASE_URL??'https://integrate.api.nvidia.com/v1';
   if(!/^https:\/\//.test(baseUrl))throw new Error('NVIDIA_BASE_URL must use HTTPS');
-  return {apiKey:env.NVIDIA_API_KEY,baseUrl:baseUrl.replace(/\/$/,''),model:env.NVIDIA_MODEL,timeoutMs:Number(env.NVIDIA_REQUEST_TIMEOUT_MS??60000),maxAttempts:Math.min(3,Math.max(1,Number(env.NVIDIA_MAX_ATTEMPTS??3))),jsonMode:env.NVIDIA_JSON_MODE==='true'};
+  const maxOutputTokens=Number(env.NVIDIA_MAX_OUTPUT_TOKENS??8192);
+  if(!Number.isInteger(maxOutputTokens)||maxOutputTokens<1024||maxOutputTokens>16384)throw new Error('NVIDIA_MAX_OUTPUT_TOKENS must be an integer from 1024 to 16384');
+  return {apiKey:env.NVIDIA_API_KEY,baseUrl:baseUrl.replace(/\/$/,''),model:env.NVIDIA_MODEL,timeoutMs:Number(env.NVIDIA_REQUEST_TIMEOUT_MS??90000),maxAttempts:Math.min(3,Math.max(1,Number(env.NVIDIA_MAX_ATTEMPTS??3))),maxOutputTokens,jsonMode:env.NVIDIA_JSON_MODE==='true'};
 }
 const wait=(ms:number)=>new Promise(resolve=>setTimeout(resolve,ms));
 export class NvidiaClient {

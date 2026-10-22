@@ -1,7 +1,10 @@
 import { readFile } from 'node:fs/promises';
+import { existsSync } from 'node:fs';
 import { basename, extname } from 'node:path';
 import { prepareDocument } from '@zamp/document';
 import { MockVisionProvider, NvidiaVisionProvider, normalizeExtraction, validateExtraction, extractionQuality, overallConfidence } from '@zamp/ai';
+
+if(existsSync('.env.local'))process.loadEnvFile('.env.local');
 
 const path=process.argv[2];
 if(!path){console.error('Usage: npm run extract:invoice -- ./invoice.pdf [invoice-number-hint]');process.exit(2)}
@@ -12,4 +15,5 @@ const provider=process.env.AI_PROVIDER==='mock'?new MockVisionProvider():new Nvi
 const result=await provider.extractInvoice({pages:document.pages,filename:basename(path),hint:process.argv[3]});
 const invoice=normalizeExtraction(result.extraction);
 const checks=validateExtraction(invoice);
-console.log(JSON.stringify({file:path,pages:document.pages.length,provider:result.provider,model:result.model,status:extractionQuality(invoice),invoiceNumber:invoice.invoiceNumber,vendor:invoice.vendor.name,poNumber:invoice.poNumber,currency:invoice.currency,subtotal:invoice.subtotal,tax:invoice.tax,total:invoice.total,lineItems:invoice.lineItems.length,confidence:overallConfidence(invoice),checks,warnings:invoice.warnings},null,2));
+const status=invoice.documentType==='NOT_INVOICE'?'INVALID':invoice.documentType==='UNKNOWN'?'PARTIAL':extractionQuality(invoice);
+console.log(JSON.stringify({file:path,pages:document.pages.length,provider:result.provider,model:result.model,documentType:invoice.documentType,status,invoiceNumber:invoice.invoiceNumber,vendor:invoice.vendor.name,poNumber:invoice.poNumber,currency:invoice.currency,subtotal:invoice.subtotal,tax:invoice.tax,total:invoice.total,lineItems:invoice.lineItems.length,confidence:overallConfidence(invoice),checks,warnings:invoice.warnings},null,2));

@@ -8,7 +8,7 @@ import { PROMPT_VERSION, SCHEMA_VERSION } from '../prompts/invoice-extraction';
 
 export async function extractInvoiceDocument(args:{db:SupabaseClient;provider:VisionModelProvider;invoiceId:string;document:InvoiceDocumentInput;hint?:string}){
   const {db,provider,invoiceId,document,hint}=args;
-  const {data:invoice,error:invoiceError}=await db.from('invoices').select('id').eq('id',invoiceId).maybeSingle();
+  const {data:invoice,error:invoiceError}=await db.from('invoices').select('id,invoice_number').eq('id',invoiceId).maybeSingle();
   if(invoiceError)throw invoiceError;
   if(!invoice)throw new ExtractionError('DOCUMENT_NOT_FOUND','Invoice record not found');
   const {data:runId,error:startError}=await db.rpc('start_processing_run',{p_invoice_id:invoiceId,p_agent_version:'phase02-v1',p_policy_version:null});
@@ -17,13 +17,13 @@ export async function extractInvoiceDocument(args:{db:SupabaseClient;provider:Vi
   try{
     const prepared=await prepareDocument(document);
     pageCount=prepared.pages.length;
-    const result=await provider.extractInvoice({pages:prepared.pages,filename:document.filename,invoiceId,hint});
+    const result=await provider.extractInvoice({pages:prepared.pages,filename:document.filename,invoiceId,hint:hint??invoice.invoice_number??undefined});
     if(result.extraction.documentType==='NOT_INVOICE')throw new ExtractionError('NOT_AN_INVOICE','Document is not an invoice',result.rawResponse);
     if(result.extraction.documentType==='UNKNOWN'&& !result.extraction.invoiceNumber && !result.extraction.vendor.name && result.extraction.total==null)
       throw new ExtractionError('NO_INVOICE_CONTENT','No reliable invoice content found',result.rawResponse);
     const normalized=normalizeExtraction(result.extraction);
     const validation=validateExtraction(normalized);
-    const status=extractionQuality(normalized);
+    const status=normalized.documentType==='UNKNOWN'?'PARTIAL':extractionQuality(normalized);
     const confidence=overallConfidence(normalized);
     const steps=[
       {number:1,type:'SYSTEM',name:'Document validated',output:{mimeType:prepared.mimeType,sizeBytes:prepared.sizeBytes},durationMs:0},

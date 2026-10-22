@@ -10,9 +10,9 @@ Copy `.env.example` to `.env.local` at the repository root. Fill the project URL
 
 ## NVIDIA setup
 
-Set `NVIDIA_API_KEY` and `NVIDIA_MODEL` in `.env.local` for real mode. `NVIDIA_BASE_URL` defaults to `https://integrate.api.nvidia.com/v1`; change it for a self-hosted NIM. Set `NVIDIA_REQUEST_TIMEOUT_MS` (default 60000), `NVIDIA_MAX_ATTEMPTS` (maximum 3), and `NVIDIA_JSON_MODE=true` only when the selected model supports JSON response format. The provider offers a `health()` method that checks the configured model against `GET /models`. Extraction calls `POST /chat/completions` with ordered text and base64 image parts. It retries timeouts, network errors, HTTP 429 and 5xx, but never retries auth errors or invalid documents. It retries truncated/malformed model output once before failing closed. The app never switches to mock after a real provider failure.
+Set `NVIDIA_API_KEY` in `.env.local` for real mode. The default model in `.env.example` is `nvidia/nemotron-3-nano-omni-30b-a3b-reasoning`, selected after live invoice tests. `NVIDIA_BASE_URL` defaults to `https://integrate.api.nvidia.com/v1`; change it for a self-hosted NIM. Set `NVIDIA_REQUEST_TIMEOUT_MS` (default 90000), `NVIDIA_MAX_OUTPUT_TOKENS` (default 8192), `NVIDIA_MAX_ATTEMPTS` (maximum 3), and `NVIDIA_JSON_MODE=true` only when the selected model supports JSON response format. Nano Omni's reasoning output is disabled for JSON extraction. The provider offers a `health()` method that checks the configured model against `GET /models`. Extraction calls `POST /chat/completions` with ordered text and base64 image parts. It retries timeouts, network errors, HTTP 429 and 5xx, but never retries auth errors or invalid documents. It retries truncated/malformed model output once before failing closed. The app never switches to mock after a real provider failure.
 
-NVIDIA model availability, input limits, and structured-output support depend on the selected model. Verify its [official request reference](https://docs.api.nvidia.com/nim/reference/qwen-qwen3-5-122b-a10b-infer) when choosing `NVIDIA_MODEL`. The repository does not contain an NVIDIA API key, so real NIM calls require configuration.
+NVIDIA model availability, input limits, and structured-output support depend on the selected model. See the [model survey and live test notes](docs/nvidia-model-selection.md) and the [Nano Omni API reference](https://docs.api.nvidia.com/nim/re/reference/nvidia-nemotron-3-nano-omni-30b-a3b-reasoning-infer) before changing `NVIDIA_MODEL`. The repository does not contain an NVIDIA API key; the ignored local `.env.local` is required for real NIM calls.
 
 ## Document support
 
@@ -20,7 +20,7 @@ NVIDIA model availability, input limits, and structured-output support depend on
 
 ## Extraction schema and persistence
 
-The model output includes document classification, invoice number and dates, vendor and buyer, PO number, currency, line items, subtotal, tax, total, payment terms, and per-field confidence. Zod rejects wrong types or confidence outside 0–1. Normalization maps explicit currency symbols and names to ISO codes, parses common date forms, and flags ambiguous dates. Math checks compare quantity × price, line sums, and subtotal + tax without changing extracted values. Missing PO alone is allowed. A non-invoice or blank document cannot become a successful invoice extraction.
+The model output includes document classification, invoice number and dates, vendor and buyer, PO number, currency, line items, subtotal, tax, total, payment terms, per-field confidence, and optional page provenance. Zod rejects wrong types or confidence outside 0–1. Normalization maps explicit currency symbols and names to ISO codes, parses common date forms, and flags ambiguous dates. Math checks compare quantity × price, line sums, and subtotal + tax without changing extracted values. Missing PO alone is allowed. A non-invoice or blank document cannot become a successful invoice extraction.
 
 `invoice_extractions` stores the raw model response, parsed and normalized outputs, model and prompt versions, usage, latency, validation result, status (`COMPLETE`, `PARTIAL`, `INVALID`, `FAILED`), and a canonical flag. History is append-only except for changing the canonical flag. `invoices.current_extraction_id` points to the latest successful result. A single Postgres RPC updates current invoice fields, complete line items, run steps, run status, and audit event. Incomplete line items remain in extraction history and are not fabricated in `invoice_lines`. A separate RPC records failures. No Phase 02 code changes vendor, PO, approval, or rejection decisions.
 
@@ -34,6 +34,8 @@ npm test
 npm run build
 npm run dev
 ```
+
+`npm run dev` starts a Webpack development server with polling for this macOS environment, then serves the current UI at `http://localhost:3000`.
 
 For command-line extraction without a database:
 
@@ -54,7 +56,7 @@ curl -X POST -H "Authorization: Bearer $EXTRACTION_API_TOKEN" \
 
 The endpoint requires a server-held bearer token and uses the latest uploaded document. Never expose that token in a browser bundle. The API is intended for development and a controlled server integration; a later phase should add user sessions and authorization policies.
 
-For a **dedicated demo project only**, `RUN_LIVE_SMOKE=yes npm run smoke:live` creates one synthetic invoice and verifies a mock extraction, canonical pointer, and five agent steps in Supabase. It leaves that labelled demo record for inspection.
+For a **dedicated demo project only**, `RUN_LIVE_SMOKE=yes npm run smoke:live` creates synthetic success and invalid-output invoices and verifies the canonical pointer, five agent steps, and distinct `INVALID` status in Supabase. It leaves those labelled demo records for inspection.
 
 The Phase 01 seed remains in `supabase/seed.sql` for local Docker resets. It contains labelled, precomputed decisions for demo scenarios. It was not loaded into the live project as real agent decisions.
 
@@ -73,4 +75,4 @@ The Phase 01 seed remains in `supabase/seed.sql` for local Docker resets. It con
 
 ## Checks and limits
 
-Unit tests use the mock provider and stub HTTP responses; they never spend NVIDIA API credits. `npm run smoke:live` verified the connected Supabase transaction using synthetic data. A two-page PDF was rendered and extracted in mock CLI mode. A real NVIDIA request still requires a user-provided key and model. The first UI page remains a minimal shell. The signed-in [Base44 reference](https://zamp-invoice-flow.base44.app/) and requested light-blue styling are the target for a later UI phase; Phase 02 specifically covers extraction and data persistence.
+Unit tests use the mock provider and stub HTTP responses; they never spend NVIDIA API credits. `npm run smoke:live` verified the connected Supabase transaction using synthetic data. A two-page PDF was rendered and extracted in mock CLI mode. Real NVIDIA Nano Omni calls extracted two synthetic invoices: a sparse invoice without inventing a subtotal, and a two-line tax invoice with all three arithmetic checks passing. The first UI page remains a minimal shell. The signed-in [Base44 reference](https://zamp-invoice-flow.base44.app/) and requested light-blue styling are the target for a later UI phase; Phase 02 specifically covers extraction and data persistence.

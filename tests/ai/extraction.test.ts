@@ -19,10 +19,15 @@ describe('invoice extraction validation',()=>{
   it('flags ambiguous dates without guessing',async()=>{const invoice=await fixture('perfect-invoice.json');invoice.invoiceDate='01/02/2026';const value=normalizeExtraction(invoice);expect(value.invoiceDate).toBeNull();expect(value.warnings[0]).toContain('ambiguous')});
   it('does not alter arithmetic mismatches',async()=>{const invoice=await fixture('perfect-invoice.json');invoice.total=112101;const report=validateExtraction(invoice);expect(report.totalMath).toBe('FAIL');expect(invoice.total).toBe(112101)});
   it('rejects wrong field types and confidence beyond 1',async()=>{const invoice=await fixture('perfect-invoice.json');expect(ExtractedInvoiceSchema.safeParse({...invoice,total:{amount:1}}).success).toBe(false);expect(ExtractedInvoiceSchema.safeParse({...invoice,confidence:{total:1.2}}).success).toBe(false)});
+  it('accepts percent tax rates and reports bad monetary text without throwing',async()=>{const invoice=await fixture('perfect-invoice.json');expect(ExtractedInvoiceSchema.parse({...invoice,lineItems:[{...invoice.lineItems[0],taxRate:'18%'}]}).lineItems[0].taxRate).toBe(18);expect(ExtractedInvoiceSchema.safeParse({...invoice,total:'not an amount'}).success).toBe(false)});
   it('rejects a spoofed MIME type',()=>{expect(()=>validateDocument({bytes:Buffer.from('hello'),mimeType:'application/pdf',filename:'invoice.pdf'})).toThrow(DocumentError)});
+  it('accepts a sparse non-invoice classification without inventing invoice fields',()=>{
+    const value=ExtractedInvoiceSchema.parse({documentType:'NOT_INVOICE'});
+    expect(value.invoiceNumber).toBeNull();expect(value.vendor.name).toBeNull();expect(value.lineItems).toEqual([]);
+  });
 });
 describe('NVIDIA provider',()=>{
-  const config:NvidiaConfig={apiKey:'test',baseUrl:'https://example.test/v1',model:'vision-test',timeoutMs:1000,maxAttempts:1,jsonMode:false};
+  const config:NvidiaConfig={apiKey:'test',baseUrl:'https://example.test/v1',model:'vision-test',timeoutMs:1000,maxAttempts:1,maxOutputTokens:8192,jsonMode:false};
   const input={pages:[{pageNumber:1,mimeType:'image/png' as const,bytes:Buffer.from('fake')}],filename:'test.png'};
   it('sends image content and parses valid JSON',async()=>{
     const invoice=await fixture('perfect-invoice.json');
@@ -32,6 +37,16 @@ describe('NVIDIA provider',()=>{
     });
     const result=await new NvidiaVisionProvider(config,fetcher as typeof fetch).extractInvoice(input);
     expect(result.extraction.invoiceNumber).toBe('INV-1048');
+  });
+  it('turns off Nano Omni reasoning and bounds its JSON output',async()=>{
+    const invoice=await fixture('perfect-invoice.json');
+    const fetcher=vi.fn(async (_url:string,request:RequestInit)=>{
+      const body=JSON.parse(String(request.body));
+      expect(body.chat_template_kwargs).toEqual({enable_thinking:false});
+      expect(body.max_tokens).toBe(8192);
+      return new Response(JSON.stringify({choices:[{message:{content:JSON.stringify(invoice)},finish_reason:'stop'}]}),{status:200});
+    });
+    await new NvidiaVisionProvider({...config,model:'nvidia/nemotron-3-nano-omni-30b-a3b-reasoning'},fetcher as typeof fetch).extractInvoice(input);
   });
   it('retries truncated output then fails closed',async()=>{
     const fetcher=vi.fn(async()=>new Response(JSON.stringify({choices:[{message:{content:'{}'},finish_reason:'length'}]}),{status:200}));
@@ -53,6 +68,13 @@ describe('NVIDIA provider',()=>{
   it('classifies malformed JSON as an invalid extraction',async()=>{
     const fetcher=vi.fn(async()=>new Response(JSON.stringify({choices:[{message:{content:'{oops'},finish_reason:'stop'}]}),{status:200}));
     await expect(new NvidiaVisionProvider(config,fetcher as typeof fetch).extractInvoice(input)).rejects.toMatchObject({code:'EXTRACTION_JSON_INVALID'});
+  });
+  it('accepts a non-invoice classification and discards PO fields',async()=>{
+    const fetcher=vi.fn(async()=>new Response(JSON.stringify({choices:[{message:{content:JSON.stringify({documentType:'NOT_INVOICE',poNumber:'PO-884',provenance:{poNumber:'PO-884'}})},finish_reason:'stop'}]}),{status:200}));
+    const result=await new NvidiaVisionProvider(config,fetcher as typeof fetch).extractInvoice(input);
+    expect(result.extraction.documentType).toBe('NOT_INVOICE');
+    expect(result.extraction.poNumber).toBeNull();
+    expect(fetcher).toHaveBeenCalledTimes(1);
   });
   it('sends every page in order',async()=>{
     const invoice=await fixture('perfect-invoice.json');

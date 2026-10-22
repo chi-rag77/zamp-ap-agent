@@ -2,7 +2,7 @@
 import { readFileSync } from 'node:fs';
 import { createClient } from '@supabase/supabase-js';
 import sharp from 'sharp';
-import { extractInvoiceDocument, MockVisionProvider } from '@zamp/ai';
+import { extractInvoiceDocument, MockVisionProvider, PROMPT_VERSION, SCHEMA_VERSION } from '@zamp/ai';
 
 if(process.env.RUN_LIVE_SMOKE!=='yes')throw new Error('Set RUN_LIVE_SMOKE=yes for the dedicated demo project');
 for(const line of readFileSync('.env.local','utf8').split('\n')){
@@ -20,4 +20,12 @@ const {data:state,error:stateError}=await db.from('invoices').select('invoice_nu
 if(stateError||state?.current_extraction_id!==result.extractionId||state?.invoice_number!=='INV-1048')throw new Error('Canonical extraction did not persist');
 const {count,error:countError}=await db.from('agent_steps').select('*',{count:'exact',head:true}).eq('run_id',result.runId);
 if(countError||count!==5)throw new Error('Expected five persisted agent steps');
-console.log(JSON.stringify({invoiceId:invoice.id,runId:result.runId,extractionId:result.extractionId,status:result.status,steps:count,total:state.total}));
+const {data:failedInvoice,error:failedCreateError}=await db.from('invoices').insert({source:'DEMO',currency:'INR',status:'RECEIVED'}).select('id').single();
+if(failedCreateError)throw failedCreateError;
+const {data:failedRun,error:runError}=await db.rpc('start_processing_run',{p_invoice_id:failedInvoice.id,p_agent_version:'phase02-smoke-v1',p_policy_version:null});
+if(runError)throw runError;
+const {data:invalidId,error:failError}=await db.rpc('fail_invoice_extraction',{p_invoice_id:failedInvoice.id,p_run_id:failedRun,p_payload:{provider:'MOCK',model:'mock-fixture',promptVersion:PROMPT_VERSION,schemaVersion:SCHEMA_VERSION,pageCount:1,errorCode:'EXTRACTION_JSON_INVALID',message:'Synthetic malformed JSON',rawResponse:'{invalid'}});
+if(failError)throw failError;
+const {data:invalid,error:invalidError}=await db.from('invoice_extractions').select('status,error_code').eq('id',invalidId).single();
+if(invalidError||invalid?.status!=='INVALID')throw new Error('Invalid output was not recorded distinctly from provider failure');
+console.log(JSON.stringify({invoiceId:invoice.id,runId:result.runId,extractionId:result.extractionId,status:result.status,steps:count,total:state.total,invalidExtractionStatus:invalid.status}));
