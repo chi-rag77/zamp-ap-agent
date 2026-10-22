@@ -1,0 +1,11 @@
+node_modules/
+.npm-cache/
+
+.next/
+.env
+.env.local
+supabase/.temp/
+supabase/.branches/
+coverage/
+.DS_Store
+*.log

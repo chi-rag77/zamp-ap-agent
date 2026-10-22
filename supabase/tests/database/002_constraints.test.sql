@@ -1,0 +1,16 @@
+begin;
+create extension if not exists pgtap with schema extensions;
+set local search_path = public, extensions;
+select plan(10);
+select throws_ok($$insert into vendors(vendor_code,legal_name,display_name,currency) values('ACME-001','Duplicate','Duplicate','INR')$$,'23505',null,'Vendor code is unique');
+select throws_ok($$insert into purchase_orders(po_number,vendor_id,currency,po_date,subtotal,tax,total) values('PO-10234','10000000-0000-0000-0000-000000000001','INR',current_date,1,0,1)$$,'23505',null,'PO number is unique');
+select throws_ok($$insert into purchase_orders(po_number,vendor_id,currency,po_date,subtotal,tax,total) values('TEST-NEG','10000000-0000-0000-0000-000000000001','INR',current_date,-1,0,0)$$,'23514',null,'Negative PO subtotal rejected');
+select throws_ok($$insert into invoices(source,currency,extraction_confidence) values('DEMO','INR',1.1)$$,'23514',null,'Confidence over one rejected');
+select throws_ok($$insert into invoices(source,currency,total) values('DEMO','INR',-0.01)$$,'23514',null,'Negative invoice total rejected');
+select throws_ok($$insert into invoices(source,currency,vendor_id) values('DEMO','INR','99999999-9999-9999-9999-999999999999')$$,'23503',null,'Unknown vendor rejected');
+select throws_ok($$insert into invoice_lines(invoice_id,line_number,description,quantity,unit_price,amount) values('99999999-9999-9999-9999-999999999999',1,'Bad',1,1,1)$$,'23503',null,'Unknown invoice rejected');
+select throws_ok($$insert into review_cases(invoice_id,reason_code,reason) values('50000000-0000-0000-0000-000000000001','BOGUS','Bad')$$,'22P02',null,'Invalid review code rejected');
+select throws_ok($$insert into goods_receipt_lines(goods_receipt_id,po_line_id,received_quantity,accepted_quantity) values('40000000-0000-0000-0000-000000000001','30000000-0000-0000-0000-000000000005',8,9)$$,'23514',null,'Accepted quantity cannot exceed received');
+select throws_ok($$update audit_events set description='changed' where invoice_id='50000000-0000-0000-0000-000000000001'$$,'P0001',null,'Audit history cannot be rewritten');
+select * from finish();
+rollback;
