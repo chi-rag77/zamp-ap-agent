@@ -1,7 +1,7 @@
 {
   "name": "zamp-ap-agent",
   "private": true,
-  "version": "0.2.0",
+  "version": "0.3.0",
   "type": "module",
   "workspaces": [
     "apps/web",
@@ -17,6 +17,7 @@
     "demo:reset": "node scripts/reset-demo.mjs",
     "db:seed": "node scripts/reset-demo.mjs",
     "extract:invoice": "tsx scripts/extract-invoice.ts",
+    "validate:invoice": "tsx scripts/validate-invoice.ts",
     "smoke:live": "tsx scripts/smoke-live.ts",
     "dev": "WATCHPACK_POLLING=true node scripts/next-with-env.mjs dev apps/web --webpack",
     "start": "node scripts/next-with-env.mjs start apps/web"

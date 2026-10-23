@@ -1,6 +1,6 @@
-# Zamp AP Agent — Phases 01 and 02
+# Zamp AP Agent — Phases 01–03 and local workspace UI
 
-The repository contains the Supabase domain foundation and a server-side invoice extraction pipeline. Phase 02 validates PDF/PNG/JPEG documents, renders every PDF page, sends ordered page images to a configurable NVIDIA NIM vision model, validates its JSON with Zod, checks financial arithmetic in deterministic code, and stores append-only extraction history. The pipeline does not approve, reject, match vendors or POs, or make policy decisions.
+The repository contains a Supabase domain foundation, a server-side NVIDIA invoice extraction pipeline, and a deterministic invoice matching engine. Phase 02 reads documents and stores append-only extraction history. Phase 03 resolves vendors and purchase orders, compares invoice lines with purchase orders and receipts, checks financial arithmetic and duplicates, and stores versioned validation results. It does not approve or reject invoices; Phase 04 will make policy decisions from these facts.
 
 ## Live project
 
@@ -35,7 +35,28 @@ npm run build
 npm run dev
 ```
 
-`npm run dev` starts a Webpack development server with polling for this macOS environment, then serves the current UI at `http://localhost:3000`.
+`npm run dev` starts a Webpack development server with polling for this macOS environment, then serves the connected workspace at `http://localhost:3000`. The UI follows the supplied Base44 layout with a light-blue theme: overview, invoice list and case, purchase orders, vendors, exceptions, processing activity, and audit log. Its metrics and tables use actual Supabase records, not fabricated approvals. The upload button stores a PDF/PNG/JPEG privately, runs NVIDIA extraction, then invokes deterministic validation. The UI and its upload/document endpoints are deliberately available only in local development until authentication and authorization are implemented; the existing bearer-token extraction endpoints remain separate.
+
+## Phase 03 matching
+
+`packages/matching` evaluates normalized vendor GSTIN/tax ID or exact name, PO number and ownership, one-to-one SKU/description line matches, remaining PO quantity after approved prior invoices, price and tax variances, amount arithmetic, duplicate signals, and optional aggregate receipt quantities. It uses decimal arithmetic and emits evidence, reasons, blockers, warnings, 2-way and 3-way statuses. Fuzzy vendor names only produce review candidates. Missing evidence never becomes a passing check.
+
+`packages/database/src/matching-repository.ts` loads related records in batches. Migration `20261022233800_invoice_validation.sql` adds immutable `invoice_validation_runs` with engine version, processing-run linkage, audit events and atomic completion/failure functions. The table has RLS enabled and is service-role only. Each call creates a new run; it does not overwrite validation history.
+
+Validate an existing canonical extraction (or a labelled demo invoice) with:
+
+```bash
+npm run validate:invoice -- INVOICE_UUID
+```
+
+Live integration checks against **only the dedicated demo project**:
+
+```bash
+RUN_LIVE_SMOKE=yes npm exec -- tsx scripts/smoke-matching-live.ts
+RUN_LIVE_SMOKE=yes npm exec -- tsx scripts/smoke-extraction-matching-live.ts
+```
+
+The second command sends `tests/fixtures/phase03-real-invoice.png` to NVIDIA and checks a real Phase 02 extraction through persisted Phase 03 validation. Both scripts create labelled synthetic records. They require the ignored `.env.local` and leave records for inspection.
 
 For command-line extraction without a database:
 
@@ -75,4 +96,4 @@ The Phase 01 seed remains in `supabase/seed.sql` for local Docker resets. It con
 
 ## Checks and limits
 
-Unit tests use the mock provider and stub HTTP responses; they never spend NVIDIA API credits. `npm run smoke:live` verified the connected Supabase transaction using synthetic data. A two-page PDF was rendered and extracted in mock CLI mode. Real NVIDIA Nano Omni calls extracted two synthetic invoices: a sparse invoice without inventing a subtotal, and a two-line tax invoice with all three arithmetic checks passing. The first UI page remains a minimal shell. The signed-in [Base44 reference](https://zamp-invoice-flow.base44.app/) and requested light-blue styling are the target for a later UI phase; Phase 02 specifically covers extraction and data persistence.
+Unit tests use the mock provider and stub HTTP responses; they never spend NVIDIA API credits. A real NVIDIA extraction of the Phase 03 invoice image was followed by a persisted PASS validation with matched vendor, PO, both lines, and 2-way and 3-way results. The local pgTAP command requires a running Docker/Supabase database; the connected project was checked with live integration runs and SQL assertions. The matching repository currently fails closed above 500 candidate master records or 1,000 related lines, rather than silently truncating results. Production authentication, paging/search at larger scale, policy decisions, and human actions remain for later phases.

@@ -1,0 +1,19 @@
+{
+  "context": {
+    "invoice": {"id":"inv-perfect","number":"INV-1001","vendorId":"vendor-acme","poId":"po-100","currency":"INR","date":"2026-10-20","receivedAt":"2026-10-21T10:00:00Z","subtotal":"300.0000","tax":"54.0000","total":"354.0000","documentHash":null,"archivedAt":null,"status":"RECEIVED"},
+    "invoiceLines": [
+      {"id":"line-1","lineNumber":1,"sku":"A100","description":"Steel bolts","quantity":"2.0000","unitPrice":"50.0000","taxRate":"0.180000","amount":"100.0000"},
+      {"id":"line-2","lineNumber":2,"sku":"B200","description":"Safety gloves","quantity":"4.0000","unitPrice":"50.0000","taxRate":"0.180000","amount":"200.0000"}
+    ],
+    "vendorClaim":{"name":"ACME Industrial Supplies Ltd.","gstin":"27ABCDE1234F1Z5","taxId":null},
+    "poNumber":"PO #100",
+    "vendors":[{"id":"vendor-acme","name":"Acme Industrial Supplies","gstin":"27ABCDE1234F1Z5","taxId":null,"emailDomain":"acme.example","status":"ACTIVE"}],
+    "purchaseOrders":[{"id":"po-100","number":"PO-100","vendorId":"vendor-acme","currency":"INR","status":"OPEN","poDate":"2026-10-01","total":"354.0000"}],
+    "poLines":[
+      {"id":"po-line-1","poId":"po-100","lineNumber":1,"sku":"A100","description":"Steel bolts","quantity":"2.0000","unitPrice":"50.0000","taxRate":"0.180000","amount":"100.0000"},
+      {"id":"po-line-2","poId":"po-100","lineNumber":2,"sku":"B200","description":"Safety gloves","quantity":"4.0000","unitPrice":"50.0000","taxRate":"0.180000","amount":"200.0000"}
+    ],
+    "receiptLines":[],"previousInvoices":[],"extractionId":"extraction-1","taxComponents":[],"adjustments":null
+  },
+  "expected":{"status":"PASS","vendor":{"status":"MATCHED","method":"GSTIN"},"purchaseOrder":{"status":"MATCHED","poNumber":"PO-100"},"twoWayMatch":{"status":"PASS"},"threeWayMatch":{"status":"NOT_REQUIRED"},"duplicate":{"status":"NO_DUPLICATE"},"blockers":[]}
+}
