@@ -12,7 +12,7 @@ export async function evaluateSavedInvoice(invoiceId:string):Promise<{id:string;
   const [validationResult,policy,invoiceResult]=await Promise.all([
     db.from('invoice_validation_runs').select('id,run_id,invoice_id,extraction_id,status,result').eq('invoice_id',invoiceId).order('created_at',{ascending:false}).limit(1).maybeSingle(),
     getActivePolicy(),
-    db.from('invoices').select('id,vendor_id,current_extraction_id,extraction_confidence,status').eq('id',invoiceId).single()
+    db.from('invoices').select('id,vendor_id,current_extraction_id,extraction_confidence,total,currency,status').eq('id',invoiceId).single()
   ]);
   if(validationResult.error)throw new Error(validationResult.error.message);
   if(invoiceResult.error||!invoiceResult.data)throw new Error(invoiceResult.error?.message??'Invoice not found');
@@ -24,7 +24,7 @@ export async function evaluateSavedInvoice(invoiceId:string):Promise<{id:string;
   const validation=saved.result as InvoiceValidationResult;
   if(validation.runId!==saved.run_id||validation.invoiceId!==invoiceId||validation.extractionId!==saved.extraction_id||invoice.current_extraction_id!==saved.extraction_id)throw new Error('Saved validation identity mismatch');
   if(!policy)throw new Error('No active policy available');
-  const decision=evaluateInvoicePolicy(validation,policy,{extractionConfidence:invoice.extraction_confidence===null?null:Number(invoice.extraction_confidence),vendorStatus:vendorResult?.data?.status??null,alreadyProcessed:invoice.status==='APPROVED'||invoice.status==='REJECTED'});
+  const decision=evaluateInvoicePolicy(validation,policy,{extractionConfidence:invoice.extraction_confidence===null?null:Number(invoice.extraction_confidence),vendorStatus:vendorResult?.data?.status??null,alreadyProcessed:invoice.status==='APPROVED'||invoice.status==='REJECTED',invoiceAmount:invoice.total,currency:invoice.currency});
   const {data,error}=await db.rpc('persist_policy_decision',{p_validation_run_id:saved.id,p_policy_id:policy.id,p_decision:decision});
   if(error)throw new Error(error.message);return {id:data as string,decision};
 }

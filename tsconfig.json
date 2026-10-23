@@ -39,6 +39,9 @@
       ],
       "@zamp/policy": [
         "./packages/policy/src/index.ts"
+      ],
+      "@zamp/policy-import": [
+        "./packages/policy-import/src/index.ts"
       ]
     }
   },

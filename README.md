@@ -1,4 +1,4 @@
-# Zamp AP Agent — Phases 01–04 and local workspace UI
+# Zamp AP Agent — Phases 01–04, Policy Intelligence, and local workspace UI
 
 The repository contains a Supabase domain foundation, a server-side NVIDIA invoice extraction pipeline, and a deterministic invoice matching engine. Phase 02 reads documents and stores append-only extraction history. Phase 03 resolves vendors and purchase orders, compares invoice lines with purchase orders and receipts, checks financial arithmetic and duplicates, and stores versioned validation results. Phase 04 evaluates those facts against a versioned policy and records approval, review, rejection, or cannot-decide eligibility. It does not execute invoice actions.
 
@@ -48,6 +48,14 @@ node --import tsx scripts/evaluate-policy.ts INVOICE_UUID
 ```
 
 The default active policy is installed by the Phase 04 migration. Create a new policy version for future configuration changes; used versions cannot be edited. Two real saved invoices were evaluated in the connected project: one eligible for automatic approval and one requiring review. Neither changed invoice status or initiated payment.
+
+## Policy Intelligence import
+
+Open **Rules & Policies → Import policy with AI** in the local workspace. Upload up to 12 policy files per package (PDF, DOCX, XLSX, XLS, CSV, PNG, or JPEG; 20 MB per file and 40 MB total). File signatures, extensions, and MIME claims are checked before the originals enter the private `policy-sources` bucket. PDF and Word text, spreadsheet cells, and CSV rows are parsed before AI extraction; scanned pages and images use the configured NVIDIA vision model. Legacy XLS conversion needs LibreOffice `soffice` on the host. PDF processing needs Poppler. Temporary conversion files are removed after use.
+
+The review page shows each proposed rule, confidence, exact source quote, and original document. The reviewer can edit, approve, or ignore rules and resolve ambiguities, conflicts, unsupported statements, and drift. A source-aware assistant answers questions from the saved extraction and cites documents. Approved thresholds can produce deterministic boundary test cases. Saving creates a **draft** policy by applying supported rules to the active baseline; unsupported operators, actions, scopes, and values fail closed. Historical simulation compares the draft with the current policy on recent validated invoices. Activation is an explicit action after review and simulation, performed in one database transaction; it also rejects a stale simulation if the active policy has changed.
+
+Policy import tables and storage have RLS with service-role-only access. Import API routes are restricted to the local same-origin workspace because user authentication and organization authorization are not yet present. The live smoke test used a synthetic CSV and confirmed upload, NVIDIA extraction, review, draft creation, and simulation; no sample policy was activated.
 
 ## Phase 03 matching
 

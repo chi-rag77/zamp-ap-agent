@@ -1,0 +1,10 @@
+import {z} from 'zod';
+export const RuleKeySchema=z.enum(['requiresPo','requireVendorMatch','requireCurrencyMatch','maxPriceVariancePercent','maxQuantityVariancePercent','maxTotalVariancePercent','minExtractionConfidence','confirmedDuplicate','blockedVendor','invoiceAmountReview']);
+export const RuleActionSchema=z.enum(['AUTO_APPROVE','NEEDS_REVIEW','AUTO_REJECT','MANAGER_REVIEW','FINANCE_REVIEW','CFO_REVIEW']);
+export const RuleSchema=z.object({name:z.string().trim().min(3).max(160),type:z.enum(['VALIDATION','MATCHING','APPROVAL','RISK','EXCEPTION']),key:RuleKeySchema,operator:z.enum(['GT','GTE','LT','LTE','EQ','NEQ']),value:z.union([z.number().finite(),z.boolean(),z.string().min(1).max(80)]),action:RuleActionSchema,scope:z.string().max(300).optional(),priority:z.number().int().min(0).max(1000).optional(),currency:z.string().regex(/^[A-Z]{3}$/).optional(),sourceQuote:z.string().trim().min(3).max(1500),sourceChunkIndex:z.number().int().nonnegative(),explanation:z.string().min(5).max(1000),confidence:z.number().min(0).max(1)}).strict();
+export type ImportedRule=z.infer<typeof RuleSchema>;
+export const ModelResultSchema=z.object({policyName:z.string().max(160).default('Imported AP Policy'),description:z.string().max(1000).default(''),transcription:z.string().max(12000).optional(),rules:z.array(RuleSchema).max(30),ambiguities:z.array(z.object({statement:z.string().max(1000),question:z.string().max(500)})).max(30),unsupportedStatements:z.array(z.string().max(1000)).max(30)}).strict();
+export type ModelResult=z.infer<typeof ModelResultSchema>;
+export type SourceEvidence={documentId:string;filename:string;chunkIndex:number;quote:string;pageNumber?:number;sheetName?:string;cellRange?:string;section?:string};
+export type AnalyzedRule={rule:ImportedRule;evidence:SourceEvidence[];documentId:string;confidenceLevel:'HIGH'|'MEDIUM'|'LOW';verifiedQuote:boolean};
+export type ImportIssue={type:'AMBIGUITY'|'CONFLICT'|'UNSUPPORTED'|'DRIFT';description:string;ruleIndexes:number[];evidence:SourceEvidence[]};
