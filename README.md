@@ -35,7 +35,7 @@ npm run build
 npm run dev
 ```
 
-`npm run dev` starts a Webpack development server with polling for this macOS environment, then serves the connected workspace at `http://localhost:3000`. The UI follows the supplied Base44 layout with a light-blue theme: overview, invoice list and case, purchase orders, vendors, exceptions, processing activity, and audit log. Its metrics and tables use actual Supabase records, not fabricated approvals. The upload button stores a PDF/PNG/JPEG privately, runs NVIDIA extraction, then invokes deterministic validation. The UI and its upload/document endpoints are deliberately available only in local development until authentication and authorization are implemented; the existing bearer-token extraction endpoints remain separate.
+`npm run dev` starts a Webpack development server with polling for this macOS environment, then serves the connected workspace at `http://localhost:3000`. The UI follows the supplied Base44 layout with a light-blue theme: overview, invoice list and case, purchase orders, vendors, exceptions, processing activity, live runs, email intake, rules, analytics, settings, and audit log. Its metrics and tables use actual Supabase records, not fabricated approvals. The upload button stores a PDF/PNG/JPEG privately, runs NVIDIA extraction, then invokes deterministic validation. The UI and its upload/document endpoints are deliberately available only in local development until authentication and authorization are implemented; the existing bearer-token extraction endpoints remain separate.
 
 ## Phase 03 matching
 

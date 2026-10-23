@@ -29,17 +29,25 @@ const navigation=[
   {label:'Overview',href:'/',icon:'dashboard'},
   {heading:'INVOICES'},
   {label:'All Invoices',href:'/invoices',icon:'invoice'},
-  {label:'Needs Review',href:'/exceptions',icon:'alert'},
-  {heading:'OPERATIONS'},
+  {label:'Needs Review',href:'/invoices?view=review',icon:'alert'},
+  {label:'Approved',href:'/invoices?view=approved',icon:'check'},
+  {label:'Rejected',href:'/invoices?view=rejected',icon:'close'},
+  {heading:'AI AGENT'},
   {label:'Agent Activity',href:'/agent',icon:'agent'},
+  {label:'Live Runs',href:'/agent/runs',icon:'audit'},
+  {label:'Exceptions',href:'/exceptions',icon:'alert'},
+  {label:'Email Intake',href:'/email-intake',icon:'invoice'},
   {label:'Purchase Orders',href:'/purchase-orders',icon:'po'},
   {label:'Vendors',href:'/vendors',icon:'vendor'},
+  {label:'Rules & Policies',href:'/rules',icon:'check'},
+  {label:'Analytics',href:'/analytics',icon:'dashboard'},
   {label:'Audit Log',href:'/audit',icon:'audit'},
+  {label:'Settings',href:'/settings',icon:'help'},
 ];
 export function Shell({children}:{children:React.ReactNode}){
   const [open,setOpen]=useState(false);
   const pathname=usePathname();
-  const title=pathname==='/'?'Accounts payable':pathname.startsWith('/invoices/')?'Invoice case':pathname==='/invoices'?'Invoices':pathname==='/purchase-orders'?'Purchase orders':pathname==='/vendors'?'Vendors':pathname==='/agent'?'Agent activity':pathname==='/exceptions'?'Needs review':'Audit log';
+  const title=pathname==='/'?'Accounts payable':pathname.startsWith('/invoices/')?'Invoice case':pathname==='/invoices'?'Invoices':pathname==='/purchase-orders'?'Purchase orders':pathname==='/vendors'?'Vendors':pathname==='/agent'?'Agent activity':pathname==='/agent/runs'?'Live runs':pathname==='/exceptions'?'Exceptions':pathname==='/email-intake'?'Email intake':pathname==='/rules'?'Rules & policies':pathname==='/analytics'?'Analytics':pathname==='/settings'?'Settings':'Audit log';
   return <div className="app-shell">
     <header className="topbar"><div className="topbar-left"><button className="icon-button menu-button" type="button" aria-label="Open navigation" onClick={()=>setOpen(true)}><Icon name="menu" size={18}/></button><span className="breadcrumb"><Link href="/">Zamp</Link><span className="slash">/</span><strong>{title}</strong></span></div><div className="topbar-right"><span className="header-environment">LOCAL WORKSPACE</span><span className="top-icon"><Icon name="bell"/></span><span className="top-icon"><Icon name="help"/></span><div className="profile"><span className="avatar">ZA</span><span><strong>Zamp</strong><small>AP workspace</small></span></div></div></header>
     {open&&<><button className="nav-backdrop" type="button" aria-label="Close navigation" onClick={()=>setOpen(false)}/><aside className="sidebar" aria-label="Main navigation"><div className="sidebar-brand"><span className="brand-mark">Z</span><strong>Zamp <span>AP</span></strong><button className="icon-button sidebar-close" type="button" aria-label="Close navigation" onClick={()=>setOpen(false)}><Icon name="close"/></button></div><div className="workspace-picker"><span className="workspace-logo">Z</span><span><strong>Zamp workspace</strong><small>Finance operations</small></span><Icon name="chevron" size={14}/></div><nav>{navigation.map((item,i)=>'heading' in item?<p className="nav-heading" key={i}>{item.heading}</p>:<Link className={`nav-item ${pathname===item.href||item.href==='/invoices'&&pathname.startsWith('/invoices/')?'active':''}`} href={item.href!} key={i} onClick={()=>setOpen(false)}><Icon name={item.icon!}/><span>{item.label}</span></Link>)}</nav><div className="sidebar-footer"><span className="online-dot"/><strong>Matching engine online</strong><small>Phase 03 · deterministic validation</small></div></aside></>}

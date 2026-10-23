@@ -5,8 +5,8 @@ import {Badge,Empty} from './ui';
 import {Icon} from './shell';
 
 export type InvoiceView={id:string;number:string;vendor:string;po:string;date:string;amount:string;status:string;variance:string;confidence:string;received:string;decision:string};
-export function InvoiceTable({rows}:{rows:InvoiceView[]}){
-  const [tab,setTab]=useState('All'),[search,setSearch]=useState(''),[vendor,setVendor]=useState('All vendors'),[status,setStatus]=useState('Any');
+export function InvoiceTable({rows,initialTab='All'}:{rows:InvoiceView[];initialTab?:string}){
+  const [tab,setTab]=useState(initialTab),[search,setSearch]=useState(''),[vendor,setVendor]=useState('All vendors'),[status,setStatus]=useState('Any');
   const tabs=[['All',rows.length],['Needs review',rows.filter(r=>r.status==='NEEDS REVIEW'||r.status==='VALIDATION ISSUE').length],['Validated',rows.filter(r=>r.status==='VALIDATED').length],['Approved',rows.filter(r=>r.status==='APPROVED').length],['Rejected',rows.filter(r=>r.status==='REJECTED').length]] as const;
   const vendors=[...new Set(rows.map(r=>r.vendor))].sort();
   const visible=useMemo(()=>rows.filter(r=>{const q=search.trim().toLowerCase();return (!q||[r.number,r.vendor,r.po].some(v=>v.toLowerCase().includes(q)))&&(vendor==='All vendors'||r.vendor===vendor)&&(status==='Any'||r.status===status)&&(tab==='All'||tab==='Needs review'&&['NEEDS REVIEW','VALIDATION ISSUE'].includes(r.status)||tab.toUpperCase()===r.status)}),[rows,search,vendor,status,tab]);
