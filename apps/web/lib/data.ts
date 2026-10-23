@@ -8,27 +8,30 @@ export type VendorRow={id:string;vendor_code:string;legal_name:string;display_na
 export type PORow={id:string;po_number:string;vendor_id:string;currency:string;status:string;po_date:string;total:string;subtotal:string;tax:string};
 export type ValidationRow={id:string;invoice_id:string;status:string;engine_version:string;result:InvoiceValidationResult;created_at:string;run_id:string};
 export type ExtractionRow={id:string;invoice_id:string;status:string;overall_confidence:string|null;normalized_output:Record<string,unknown>|null;provider:string;model:string;created_at:string};
+export type DecisionRow={id:string;invoice_id:string;validation_run_id:string|null;decision:string;reason_code:string|null;summary:string;policy_version:string|null;created_at:string};
 export type AuditRow={id:string;invoice_id:string|null;event_type:string;description:string;actor_type:string;created_at:string};
 export type RunRow={id:string;invoice_id:string;status:string;agent_version:string;started_at:string|null;completed_at:string|null;duration_ms:number|null;error_code:string|null;created_at:string};
 export type ReviewRow={id:string;invoice_id:string;status:string;reason:string;reason_code:string;priority:string;created_at:string};
-export type Workspace={enabled:boolean;invoices:InvoiceRow[];vendors:VendorRow[];purchaseOrders:PORow[];validations:ValidationRow[];extractions:ExtractionRow[];audits:AuditRow[];runs:RunRow[];reviews:ReviewRow[]};
-const empty:Workspace={enabled:false,invoices:[],vendors:[],purchaseOrders:[],validations:[],extractions:[],audits:[],runs:[],reviews:[]};
+export type Workspace={enabled:boolean;invoices:InvoiceRow[];vendors:VendorRow[];purchaseOrders:PORow[];validations:ValidationRow[];decisions:DecisionRow[];extractions:ExtractionRow[];audits:AuditRow[];runs:RunRow[];reviews:ReviewRow[]};
+const empty:Workspace={enabled:false,invoices:[],vendors:[],purchaseOrders:[],validations:[],decisions:[],extractions:[],audits:[],runs:[],reviews:[]};
 function rows<T>(result:{data:T[]|null;error:{message:string}|null},name:string):T[]{if(result.error)throw new Error(`${name}: ${result.error.message}`);return result.data??[]}
 export async function loadWorkspace():Promise<Workspace>{
   if(!localWorkspace())return empty;
   const db=createServerClient();
-  const [invoices,vendors,purchaseOrders,validations,extractions,audits,runs,reviews]=await Promise.all([
+  const [invoices,vendors,purchaseOrders,validations,decisions,extractions,audits,runs,reviews]=await Promise.all([
     db.from('invoices').select('*').is('archived_at',null).order('received_at',{ascending:false}).limit(200),
     db.from('vendors').select('id,vendor_code,legal_name,display_name,gstin,currency,status').is('archived_at',null).order('legal_name').limit(200),
     db.from('purchase_orders').select('id,po_number,vendor_id,currency,status,po_date,total,subtotal,tax').is('archived_at',null).order('po_date',{ascending:false}).limit(200),
     db.from('invoice_validation_runs').select('id,invoice_id,status,engine_version,result,created_at,run_id').order('created_at',{ascending:false}).limit(200),
+    db.from('agent_decisions').select('id,invoice_id,validation_run_id,decision,reason_code,summary,policy_version,created_at').order('created_at',{ascending:false}).limit(200),
     db.from('invoice_extractions').select('id,invoice_id,status,overall_confidence,normalized_output,provider,model,created_at').eq('is_canonical',true).order('created_at',{ascending:false}).limit(200),
     db.from('audit_events').select('id,invoice_id,event_type,description,actor_type,created_at').order('created_at',{ascending:false}).limit(100),
     db.from('processing_runs').select('id,invoice_id,status,agent_version,started_at,completed_at,duration_ms,error_code,created_at').order('created_at',{ascending:false}).limit(100),
     db.from('review_cases').select('id,invoice_id,status,reason,reason_code,priority,created_at').order('created_at',{ascending:false}).limit(100)
   ]);
-  return {enabled:true,invoices:rows(invoices,'invoices') as InvoiceRow[],vendors:rows(vendors,'vendors') as VendorRow[],purchaseOrders:rows(purchaseOrders,'purchase orders') as PORow[],validations:rows(validations,'validations') as ValidationRow[],extractions:rows(extractions,'extractions') as ExtractionRow[],audits:rows(audits,'audit events') as AuditRow[],runs:rows(runs,'processing runs') as RunRow[],reviews:rows(reviews,'review cases') as ReviewRow[]};
+  return {enabled:true,invoices:rows(invoices,'invoices') as InvoiceRow[],vendors:rows(vendors,'vendors') as VendorRow[],purchaseOrders:rows(purchaseOrders,'purchase orders') as PORow[],validations:rows(validations,'validations') as ValidationRow[],decisions:rows(decisions,'decisions') as DecisionRow[],extractions:rows(extractions,'extractions') as ExtractionRow[],audits:rows(audits,'audit events') as AuditRow[],runs:rows(runs,'processing runs') as RunRow[],reviews:rows(reviews,'review cases') as ReviewRow[]};
 }
+export const latestDecision=(workspace:Workspace,invoiceId:string)=>workspace.decisions.find(row=>row.invoice_id===invoiceId);
 export const latestValidation=(workspace:Workspace,invoiceId:string)=>workspace.validations.find(row=>row.invoice_id===invoiceId);
 export const extractionFor=(workspace:Workspace,invoiceId:string)=>workspace.extractions.find(row=>row.invoice_id===invoiceId);
 export function vendorName(workspace:Workspace,invoice:InvoiceRow){

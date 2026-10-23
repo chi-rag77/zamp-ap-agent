@@ -7,7 +7,7 @@ export const InvoiceDecisions = ['AUTO_APPROVED','HUMAN_APPROVED','AUTO_REJECTED
 export const ProcessingRunStatuses = ['QUEUED','RUNNING','COMPLETED','FAILED','CANCELLED'] as const;
 export const AgentStepStatuses = ['PENDING','RUNNING','COMPLETED','FAILED','SKIPPED'] as const;
 export const AgentStepTypes = ['SYSTEM','AI','VALIDATION','MATCHING','POLICY','ACTION'] as const;
-export const AgentDecisionTypes = ['AUTO_APPROVED','AUTO_REJECTED','NEEDS_REVIEW'] as const;
+export const AgentDecisionTypes = ['AUTO_APPROVED','AUTO_REJECTED','NEEDS_REVIEW','CANNOT_DECIDE'] as const;
 export const AgentActions = ['NONE','APPROVE','REJECT','CREATE_REVIEW'] as const;
 export const ActionStatuses = ['PENDING','EXECUTED','FAILED','VERIFIED'] as const;
 export const PolicyStatuses = ['DRAFT','ACTIVE','ARCHIVED'] as const;
@@ -48,7 +48,7 @@ export interface Invoice extends RecordBase { invoice_number:string|null; vendor
 export interface InvoiceLine extends RecordBase { invoice_id:UUID; line_number:number; sku:string|null; description:string; quantity:Decimal; unit_price:Decimal; tax_rate:Decimal|null; amount:Decimal; extraction_confidence:Decimal|null; metadata:Json|null; updated_at:string }
 export interface ProcessingRun extends RecordBase { invoice_id:UUID; status:ProcessingRunStatus; started_at:string|null; completed_at:string|null; duration_ms:number|null; agent_version:string; policy_version:string|null; error_code:string|null; error_message:string|null; metadata:Json|null }
 export interface AgentStep extends RecordBase { run_id:UUID; step_number:number; step_type:AgentStepType; name:string; status:AgentStepStatus; input:Json|null; output:Json|null; confidence:Decimal|null; duration_ms:number|null; started_at:string|null; completed_at:string|null; error_message:string|null }
-export interface AgentDecision extends RecordBase { invoice_id:UUID; run_id:UUID; decision:AgentDecisionType; confidence:Decimal|null; summary:string; reasoning_summary:string; policy_id:UUID|null; policy_version:string|null; action:AgentAction; action_status:ActionStatus }
+export interface AgentDecision extends RecordBase { invoice_id:UUID; run_id:UUID; decision:AgentDecisionType; confidence:Decimal|null; summary:string; reasoning_summary:string; policy_id:UUID|null; policy_version:string|null; action:AgentAction; action_status:ActionStatus; validation_run_id:UUID|null; reason_code:string|null; evidence:Json; blockers:Json; warnings:Json; recommended_action:string|null; evaluation_duration_ms:number|null }
 export interface Policy extends RecordBase { name:string; version:string; status:PolicyStatus; configuration:Json; effective_from:string|null; updated_at:string }
 export interface ReviewCase extends RecordBase { invoice_id:UUID; run_id:UUID|null; status:ReviewCaseStatus; reason_code:ReviewReasonCode; reason:string; priority:Priority; assigned_to:UUID|null; resolution:string|null; resolved_by:UUID|null; resolved_at:string|null; updated_at:string }
 export interface AuditEvent extends RecordBase { invoice_id:UUID|null; run_id:UUID|null; actor_type:ActorType; actor_id:string|null; event_type:string; description:string; metadata:Json|null }

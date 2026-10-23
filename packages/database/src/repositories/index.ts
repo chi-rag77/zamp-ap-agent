@@ -50,7 +50,7 @@ export const selects = {
  invoice_lines:'id,invoice_id,line_number,sku,description,quantity::text,unit_price::text,tax_rate::text,amount::text,extraction_confidence::text,metadata,created_at,updated_at',
  processing_runs:'*',
  agent_steps:'id,run_id,step_number,step_type,name,status,input,output,confidence::text,duration_ms,started_at,completed_at,error_message,created_at',
- agent_decisions:'id,invoice_id,run_id,decision,confidence::text,summary,reasoning_summary,policy_id,policy_version,action,action_status,created_at',
+ agent_decisions:'id,invoice_id,run_id,decision,confidence::text,summary,reasoning_summary,policy_id,policy_version,action,action_status,validation_run_id,reason_code,evidence,blockers,warnings,recommended_action,evaluation_duration_ms,created_at',
  policies:'*',review_cases:'*',audit_events:'*',email_messages:'*',email_attachments:'*',invoice_documents:'*'
 } as const;
 type Table = keyof typeof selects;

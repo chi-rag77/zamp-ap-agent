@@ -1,6 +1,6 @@
-# Zamp AP Agent — Phases 01–03 and local workspace UI
+# Zamp AP Agent — Phases 01–04 and local workspace UI
 
-The repository contains a Supabase domain foundation, a server-side NVIDIA invoice extraction pipeline, and a deterministic invoice matching engine. Phase 02 reads documents and stores append-only extraction history. Phase 03 resolves vendors and purchase orders, compares invoice lines with purchase orders and receipts, checks financial arithmetic and duplicates, and stores versioned validation results. It does not approve or reject invoices; Phase 04 will make policy decisions from these facts.
+The repository contains a Supabase domain foundation, a server-side NVIDIA invoice extraction pipeline, and a deterministic invoice matching engine. Phase 02 reads documents and stores append-only extraction history. Phase 03 resolves vendors and purchase orders, compares invoice lines with purchase orders and receipts, checks financial arithmetic and duplicates, and stores versioned validation results. Phase 04 evaluates those facts against a versioned policy and records approval, review, rejection, or cannot-decide eligibility. It does not execute invoice actions.
 
 ## Live project
 
@@ -36,6 +36,18 @@ npm run dev
 ```
 
 `npm run dev` starts a Webpack development server with polling for this macOS environment, then serves the connected workspace at `http://localhost:3000`. The UI follows the supplied Base44 layout with a light-blue theme: overview, invoice list and case, purchase orders, vendors, exceptions, processing activity, live runs, email intake, rules, analytics, settings, and audit log. Its metrics and tables use actual Supabase records, not fabricated approvals. The upload button stores a PDF/PNG/JPEG privately, runs NVIDIA extraction, then invokes deterministic validation. The UI and its upload/document endpoints are deliberately available only in local development until authentication and authorization are implemented; the existing bearer-token extraction endpoints remain separate.
+
+## Phase 04 policy decisions
+
+`packages/policy` consumes the exact saved Phase 03 result, the active version of the existing `policies` record, and server-loaded extraction confidence and vendor status. It produces a deterministic decision, reason code, threshold evidence, blockers, warnings, and a recommended next step. Missing or invalid facts fail closed. The database stores immutable decision history and an audit event, while `action=NONE` keeps eligibility separate from approval, rejection, and payment execution.
+
+The local Rules & Policies page displays the active policy in the light-blue Base44 style. An invoice case shows saved decision evidence and offers an explicit **Evaluate policy** button. The local-only endpoint requires a same-origin POST. From the command line, run:
+
+```bash
+node --import tsx scripts/evaluate-policy.ts INVOICE_UUID
+```
+
+The default active policy is installed by the Phase 04 migration. Create a new policy version for future configuration changes; used versions cannot be edited. Two real saved invoices were evaluated in the connected project: one eligible for automatic approval and one requiring review. Neither changed invoice status or initiated payment.
 
 ## Phase 03 matching
 
@@ -96,4 +108,4 @@ The Phase 01 seed remains in `supabase/seed.sql` for local Docker resets. It con
 
 ## Checks and limits
 
-Unit tests use the mock provider and stub HTTP responses; they never spend NVIDIA API credits. A real NVIDIA extraction of the Phase 03 invoice image was followed by a persisted PASS validation with matched vendor, PO, both lines, and 2-way and 3-way results. The local pgTAP command requires a running Docker/Supabase database; the connected project was checked with live integration runs and SQL assertions. The matching repository currently fails closed above 500 candidate master records or 1,000 related lines, rather than silently truncating results. Production authentication, paging/search at larger scale, policy decisions, and human actions remain for later phases.
+Unit tests use the mock provider and stub HTTP responses; they never spend NVIDIA API credits. A real NVIDIA extraction of the Phase 03 invoice image was followed by a persisted PASS validation with matched vendor, PO, both lines, and 2-way and 3-way results. The local pgTAP command requires a running Docker/Supabase database; the connected project was checked with live integration runs and SQL assertions. The matching repository currently fails closed above 500 candidate master records or 1,000 related lines, rather than silently truncating results. Production authentication, paging/search at larger scale, human actions, and payment execution remain for later phases.

@@ -1,0 +1,1 @@
+{"name":"@zamp/policy","version":"0.4.0","private":true,"type":"module","exports":"./src/index.ts","dependencies":{"@zamp/matching":"0.3.0","zod":"4.1.11"}}

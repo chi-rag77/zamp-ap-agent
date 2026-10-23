@@ -1,7 +1,7 @@
 {
   "name": "zamp-ap-agent",
   "private": true,
-  "version": "0.3.0",
+  "version": "0.4.0",
   "type": "module",
   "workspaces": [
     "apps/web",
@@ -20,7 +20,8 @@
     "validate:invoice": "tsx scripts/validate-invoice.ts",
     "smoke:live": "tsx scripts/smoke-live.ts",
     "dev": "WATCHPACK_POLLING=true node scripts/next-with-env.mjs dev apps/web --webpack",
-    "start": "node scripts/next-with-env.mjs start apps/web"
+    "start": "node scripts/next-with-env.mjs start apps/web",
+    "policy:invoice": "node --import tsx scripts/evaluate-policy.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "2.76.1",

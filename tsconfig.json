@@ -1,11 +1,55 @@
 {
   "compilerOptions": {
-    "target": "ES2022", "lib": ["ES2022", "DOM", "DOM.Iterable"], "module": "ESNext",
-    "moduleResolution": "Bundler", "jsx": "preserve", "strict": true, "noEmit": true,
-    "esModuleInterop": true, "skipLibCheck": true, "resolveJsonModule": true,
-    "types": ["node", "vitest/globals"],
-    "paths": {"@zamp/domain": ["./packages/domain/src/index.ts"], "@zamp/validation": ["./packages/validation/src/index.ts"], "@zamp/database": ["./packages/database/src/index.ts"], "@zamp/ai": ["./packages/ai/src/index.ts"], "@zamp/document": ["./packages/document/src/index.ts"], "@zamp/matching": ["./packages/matching/src/index.ts"]}
+    "target": "ES2022",
+    "lib": [
+      "ES2022",
+      "DOM",
+      "DOM.Iterable"
+    ],
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "jsx": "preserve",
+    "strict": true,
+    "noEmit": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+    "types": [
+      "node",
+      "vitest/globals"
+    ],
+    "paths": {
+      "@zamp/domain": [
+        "./packages/domain/src/index.ts"
+      ],
+      "@zamp/validation": [
+        "./packages/validation/src/index.ts"
+      ],
+      "@zamp/database": [
+        "./packages/database/src/index.ts"
+      ],
+      "@zamp/ai": [
+        "./packages/ai/src/index.ts"
+      ],
+      "@zamp/document": [
+        "./packages/document/src/index.ts"
+      ],
+      "@zamp/matching": [
+        "./packages/matching/src/index.ts"
+      ],
+      "@zamp/policy": [
+        "./packages/policy/src/index.ts"
+      ]
+    }
   },
-  "include": ["apps/**/*.ts", "apps/**/*.tsx", "packages/**/*.ts", "tests/**/*.ts", "scripts/**/*.ts"],
-  "exclude": ["node_modules"]
+  "include": [
+    "apps/**/*.ts",
+    "apps/**/*.tsx",
+    "packages/**/*.ts",
+    "tests/**/*.ts",
+    "scripts/**/*.ts"
+  ],
+  "exclude": [
+    "node_modules"
+  ]
 }
