@@ -6,7 +6,7 @@ import {WorkspaceBrief} from '../../components/workspace-brief';
 
 export const dynamic='force-dynamic';
 export default async function InvoicesPage({searchParams}:{searchParams:Promise<{view?:string;q?:string}>}){
-  const w=await loadWorkspace();
+  const w=await loadWorkspace('invoices');
   const params=await searchParams;
   const view=params.view;
   const initialSearch=params.q??'';

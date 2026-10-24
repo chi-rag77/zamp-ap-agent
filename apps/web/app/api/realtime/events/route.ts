@@ -8,7 +8,15 @@ export async function GET(request:NextRequest){
   const after=request.nextUrl.searchParams.get('after')??'0';
   if(!/^\d{1,18}$/.test(after))return NextResponse.json({error:'Invalid event cursor'},{status:400});
   try{
-    const {data,error}=await (await createWebServerClient()).from('processing_events')
+    const db=await createWebServerClient();
+    // A fresh browser only needs the current sequence as its starting point. Returning
+    // historical events here caused a page refresh storm on every navigation.
+    if(after==='0'){
+      const {data,error}=await db.from('processing_events').select('sequence').order('sequence',{ascending:false}).limit(1).maybeSingle();
+      if(error)throw error;
+      return NextResponse.json({events:[],cursor:data?String(data.sequence):'0'},{headers:{'Cache-Control':'no-store, no-cache, must-revalidate'}});
+    }
+    const {data,error}=await db.from('processing_events')
       .select('id,sequence,event_type,invoice_id,run_id,step_name,status,message,metadata,created_at')
       .gt('sequence',after).order('sequence',{ascending:true}).limit(100);
     if(error)throw error;

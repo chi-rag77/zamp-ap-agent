@@ -6,7 +6,7 @@ import {formatRunElapsed,matchesRunFilter,runFilters,type RunFilter} from '../..
 export const dynamic='force-dynamic';
 
 export default async function LiveRunsPage({searchParams}:{searchParams:Promise<{status?:string}>}){
-  const [{status:requested},w]=await Promise.all([searchParams,loadWorkspace()]);
+  const [{status:requested},w]=await Promise.all([searchParams,loadWorkspace('runs')]);
   const active=(['all','running','review','completed','failed','retrying'] as string[]).includes(requested??'')?(requested as RunFilter):'all';
   const runs=w.agentRuns.filter(run=>matchesRunFilter(active,run));
   const counts=Object.fromEntries(runFilters.map(filter=>[filter.key,w.agentRuns.filter(run=>matchesRunFilter(filter.key,run)).length])) as Record<RunFilter,number>;

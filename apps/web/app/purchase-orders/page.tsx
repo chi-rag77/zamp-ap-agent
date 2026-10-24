@@ -3,7 +3,7 @@ import {WorkspaceBrief} from '../../components/workspace-brief';
 import {loadWorkspace,money,day} from '../../lib/data';
 export const dynamic='force-dynamic';
 export default async function PurchaseOrdersPage(){
-  const w=await loadWorkspace();
+  const w=await loadWorkspace('purchaseOrders');
   const pos=w.purchaseOrders;
   const open=pos.filter(po=>['OPEN','PARTIALLY_RECEIVED'].includes(po.status));
   const openValue=open.reduce((sum,po)=>sum+Number(po.total),0);
