@@ -2,6 +2,8 @@
 import {useEffect,useRef,useState} from 'react';
 import Link from 'next/link';
 import {usePathname} from 'next/navigation';
+import {LiveUpdates} from './realtime/live-updates';
+import {NotificationCenter} from './realtime/notification-center';
 
 export function Icon({name,size=17}:{name:string;size?:number}){
   const paths:Record<string,React.ReactNode>={
@@ -48,7 +50,7 @@ const navigation=[
   {label:'Audit Log',href:'/audit',icon:'audit'},
   {label:'Settings',href:'/settings',icon:'help'},
 ];
-export function Shell({children,environment='LOCAL WORKSPACE',agentStatus='DEGRADED',agentMessage='Agent health is unavailable'}:{children:React.ReactNode;environment?:string;agentStatus?:'ONLINE'|'DEGRADED';agentMessage?:string}){
+export function Shell({children,environment='LOCAL WORKSPACE',agentStatus='DEGRADED',agentMessage='Agent health is unavailable',initialEventCursor='0'}:{children:React.ReactNode;environment?:string;agentStatus?:'ONLINE'|'DEGRADED';agentMessage?:string;initialEventCursor?:string}){
   const [open,setOpen]=useState(false);
   const [collapsed,setCollapsed]=useState(false);
   const searchRef=useRef<HTMLInputElement>(null);
@@ -58,7 +60,7 @@ export function Shell({children,environment='LOCAL WORKSPACE',agentStatus='DEGRA
   return <div className={`app-shell ${collapsed?'sidebar-collapsed':''}`} data-environment={environment}>
     <aside className={`sidebar ${open?'sidebar-open':''} ${collapsed?'sidebar-collapsed':''}`} aria-label="Main navigation"><div className="sidebar-brand"><span className="brand-mark">Z</span><strong>Zamp</strong><span className="sidebar-app-badge">AP</span><button className="icon-button sidebar-close" type="button" aria-label={collapsed?'Expand navigation':'Collapse navigation'} onClick={()=>{if(window.matchMedia('(max-width: 850px)').matches)setOpen(false);else setCollapsed(value=>!value)}}><Icon name="sidebar"/></button></div><button className="workspace-picker" type="button"><span className="workspace-logo">AC</span><span><strong>Acme Corporation</strong><small>Finance Operations</small></span><span className="workspace-chevron">⌄</span></button><nav>{navigation.map((item,i)=>'heading' in item?<p className="nav-heading" key={i}>{item.heading==='AI AGENT'?'ZAMP':item.heading}</p>:<Link className={`nav-item ${pathname===item.href||item.href==='/agent'&&pathname.startsWith('/agent/')||item.href==='/invoices'&&pathname.startsWith('/invoices/')||item.href==='/rules'&&pathname.startsWith('/rules/')?'active':''}`} href={item.href!} key={i} title={item.label} aria-label={item.label} onClick={()=>setOpen(false)}><Icon name={item.icon!}/><span>{item.label}</span></Link>)}</nav><div className="sidebar-footer"><div className={`sidebar-status ${agentStatus==='DEGRADED'?'degraded':''}`} title={agentMessage}><span className="online-dot"/><strong>Agent {agentStatus==='ONLINE'?'online':'degraded'}</strong></div><small>{agentStatus==='ONLINE'?'Ready to process invoices':'Check backend and processing configuration'}</small><div className="sidebar-last-run"><span>{environment==='PROTECTED WORKSPACE'?'Protected workspace':'Local workspace'}</span><span className="sidebar-health-state">{agentStatus==='ONLINE'?'Ready':'Check status'}</span></div></div></aside>
     {open&&<button className="nav-backdrop" type="button" aria-label="Close navigation" onClick={()=>setOpen(false)}/>}
-    <header className="topbar"><div className="topbar-left"><button className="icon-button menu-button" type="button" aria-label="Open navigation" onClick={()=>setOpen(true)}><Icon name="menu" size={18}/></button><span className="breadcrumb"><Link href="/">Zamp</Link><span className="slash">/</span><strong>{title}</strong></span></div><div className="topbar-right"><form className="global-search" action="/invoices"><Icon name="search" size={16}/><input ref={searchRef} type="search" name="q" aria-label="Search invoices, vendors, purchase orders" placeholder="Search invoices, vendors, POs..."/><kbd>⌘K</kbd></form><span className="top-icon"><Icon name="bell"/></span><span className="top-icon"><Icon name="help"/></span><div className="profile"><span className="avatar">PN</span><span><strong>Priya Nair</strong><small>AP Manager</small></span></div></div></header>
+    <header className="topbar"><div className="topbar-left"><button className="icon-button menu-button" type="button" aria-label="Open navigation" onClick={()=>setOpen(true)}><Icon name="menu" size={18}/></button><span className="breadcrumb"><Link href="/">Zamp</Link><span className="slash">/</span><strong>{title}</strong></span></div><div className="topbar-right"><form className="global-search" action="/invoices"><Icon name="search" size={16}/><input ref={searchRef} type="search" name="q" aria-label="Search invoices, vendors, purchase orders" placeholder="Search invoices, vendors, POs..."/><kbd>⌘K</kbd></form><LiveUpdates initialCursor={initialEventCursor}/><NotificationCenter/><span className="top-icon"><Icon name="help"/></span><div className="profile"><span className="avatar">PN</span><span><strong>Priya Nair</strong><small>AP Manager</small></span></div></div></header>
     <main className="page-container">{children}</main>
   </div>;
 }
