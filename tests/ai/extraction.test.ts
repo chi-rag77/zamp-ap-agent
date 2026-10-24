@@ -86,6 +86,17 @@ describe('NVIDIA provider',()=>{
     });
     await new NvidiaVisionProvider(config,fetcher as typeof fetch).extractInvoice({...input,pages:[input.pages[0],{...input.pages[0],pageNumber:2}]});
   });
+  it('includes PDF text as a bounded reading aid alongside page images',async()=>{
+    const invoice=await fixture('perfect-invoice.json');
+    const fetcher=vi.fn(async(_url:string,request:RequestInit)=>{
+      const parts=JSON.parse(String(request.body)).messages[1].content;
+      expect(parts[0].text).toContain('PDF text layer (reading aid');
+      expect(parts[0].text).toContain('Invoice No: INV-1048');
+      expect(parts.some((v:{type:string})=>v.type==='image_url')).toBe(true);
+      return new Response(JSON.stringify({choices:[{message:{content:JSON.stringify(invoice)},finish_reason:'stop'}]}),{status:200});
+    });
+    await new NvidiaVisionProvider(config,fetcher as typeof fetch).extractInvoice({...input,documentText:'Invoice No: INV-1048'});
+  });
   it('maps provider timeout',async()=>{
     const fetcher=vi.fn(async()=>{const error=new Error('timed out');error.name='TimeoutError';throw error});
     await expect(new NvidiaVisionProvider(config,fetcher as typeof fetch).extractInvoice(input)).rejects.toMatchObject({code:'NVIDIA_TIMEOUT'});
