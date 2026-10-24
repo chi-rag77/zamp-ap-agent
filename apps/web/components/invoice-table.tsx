@@ -7,8 +7,8 @@ import {Icon} from './shell';
 export type InvoiceView={id:string;number:string;vendor:string;po:string;date:string;amount:string;status:string;variance:string;confidence:string;received:string;decision:string};
 function exportCsv(rows:InvoiceView[]){const fields:['status','number','vendor','po','date','amount','variance','confidence','received','decision']=['status','number','vendor','po','date','amount','variance','confidence','received','decision'];const quote=(value:string)=>`"${value.replaceAll('"','""')}"`;const csv=[fields.join(','),...rows.map(row=>fields.map(field=>quote(row[field])).join(','))].join('\r\n');const url=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));const link=document.createElement('a');link.href=url;link.download='zamp-invoices.csv';link.click();setTimeout(()=>URL.revokeObjectURL(url),1000)}
 export function ExportInvoices({rows}:{rows:InvoiceView[]}){return <button className="button" type="button" onClick={()=>exportCsv(rows)}><Icon name="download" size={14}/>Export</button>}
-export function InvoiceTable({rows,initialTab='All'}:{rows:InvoiceView[];initialTab?:string}){
-  const [tab,setTab]=useState(initialTab),[search,setSearch]=useState(''),[vendor,setVendor]=useState('All vendors'),[status,setStatus]=useState('Any'),[decision,setDecision]=useState('Any'),[confidence,setConfidence]=useState('Any');
+export function InvoiceTable({rows,initialTab='All',initialSearch=''}:{rows:InvoiceView[];initialTab?:string;initialSearch?:string}){
+  const [tab,setTab]=useState(initialTab),[search,setSearch]=useState(initialSearch),[vendor,setVendor]=useState('All vendors'),[status,setStatus]=useState('Any'),[decision,setDecision]=useState('Any'),[confidence,setConfidence]=useState('Any');
   const eligible=(r:InvoiceView)=>r.decision.includes('AUTO APPROVED');const rejectEligible=(r:InvoiceView)=>r.decision.includes('AUTO REJECTED');
   const review=(r:InvoiceView)=>r.status==='NEEDS REVIEW'||r.status==='VALIDATION ISSUE'||r.decision.includes('NEEDS REVIEW');
   const low=(r:InvoiceView)=>r.confidence!=='—'&&Number.parseFloat(r.confidence)<90;
