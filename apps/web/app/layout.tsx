@@ -1,6 +1,7 @@
 import './globals.css';
 import './base44-listings.css';
 import './realtime.css';
+import './login.css';
 import {Inter} from 'next/font/google';
 import {Shell} from '../components/shell';
 import {vercelWorkspaceEnabled} from '../lib/data';
