@@ -6,6 +6,11 @@ import { normalizeExtraction } from './normalize-extraction';
 import { extractionQuality, overallConfidence, validateExtraction } from './validate-extraction';
 import { PROMPT_VERSION, SCHEMA_VERSION } from '../prompts/invoice-extraction';
 
+function hasStrongInvoiceTextSignals(text:string|undefined){
+  if(!text)return false;
+  return /\bTAX\s+INVOICE\b/i.test(text)&&/\bINVOICE\s+(?:NO\.?|NUMBER|DATE|AMOUNT|TOTAL)\b/i.test(text);
+}
+
 export async function extractInvoiceDocument(args:{db:SupabaseClient;provider:VisionModelProvider;invoiceId:string;document:InvoiceDocumentInput;hint?:string}){
   const {db,provider,invoiceId,document,hint}=args;
   const {data:invoice,error:invoiceError}=await db.from('invoices').select('id,invoice_number').eq('id',invoiceId).maybeSingle();
@@ -17,7 +22,13 @@ export async function extractInvoiceDocument(args:{db:SupabaseClient;provider:Vi
   try{
     const prepared=await prepareDocument(document);
     pageCount=prepared.pages.length;
-    const result=await provider.extractInvoice({pages:prepared.pages,filename:document.filename,invoiceId,hint:hint??invoice.invoice_number??undefined});
+    const input={pages:prepared.pages,filename:document.filename,invoiceId,hint:hint??invoice.invoice_number??undefined,documentText:prepared.text};
+    let result=await provider.extractInvoice(input);
+    // Avoid a false non-invoice rejection when a PDF has explicit invoice labels
+    // but the vision model misses them. Recheck once with the text evidence.
+    if(result.extraction.documentType==='NOT_INVOICE'&&hasStrongInvoiceTextSignals(prepared.text)){
+      result=await provider.extractInvoice({...input,hint:`${input.hint??''} The PDF text contains the explicit labels TAX INVOICE and Invoice No. Re-examine the page and text, treat this as an invoice, and extract only values supported by the document.`.trim()});
+    }
     if(result.extraction.documentType==='NOT_INVOICE')throw new ExtractionError('NOT_AN_INVOICE','Document is not an invoice',result.rawResponse);
     if(result.extraction.documentType==='UNKNOWN'&& !result.extraction.invoiceNumber && !result.extraction.vendor.name && result.extraction.total==null)
       throw new ExtractionError('NO_INVOICE_CONTENT','No reliable invoice content found',result.rawResponse);

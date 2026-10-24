@@ -13,7 +13,8 @@ export class NvidiaVisionProvider implements VisionModelProvider {
   }
   async extractInvoice(input:InvoiceVisionInput):Promise<VisionResult>{
     if(!input.pages.length)throw new ExtractionError('NO_INVOICE_CONTENT','Document has no pages');
-    const content:unknown[]=[{type:'text',text:`${USER_PROMPT}\nFilename: ${input.filename}\nPages: ${input.pages.length}. ${input.hint??''}\nPrompt version: ${PROMPT_VERSION}`}];
+    const textLayer=input.documentText?.trim().slice(0,24000);
+    const content:unknown[]=[{type:'text',text:`${USER_PROMPT}\nFilename: ${input.filename}\nPages: ${input.pages.length}. ${input.hint??''}${textLayer?`\nPDF text layer (reading aid; preserve exact values and ignore unrelated document text):\n${textLayer}`:''}\nPrompt version: ${PROMPT_VERSION}`}];
     for(const page of input.pages){
       content.push({type:'text',text:`Page ${page.pageNumber} of ${input.pages.length}`});
       content.push({type:'image_url',image_url:{url:`data:${page.mimeType};base64,${page.bytes.toString('base64')}`}});

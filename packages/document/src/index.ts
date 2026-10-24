@@ -3,7 +3,7 @@ export class DocumentError extends Error {constructor(public code:'DOCUMENT_NOT_
 type VisionPage={pageNumber:number;mimeType:'image/png'|'image/jpeg';bytes:Buffer};
 
 export type InvoiceDocumentInput={bytes:Buffer;mimeType:string;filename:string};
-export type PreparedDocument={pages:VisionPage[];mimeType:string;sizeBytes:number};
+export type PreparedDocument={pages:VisionPage[];mimeType:string;sizeBytes:number;text?:string};
 const supported=new Set(['application/pdf','image/png','image/jpeg','image/jpg']);
 async function loadPdfParser(){
   // Some serverless Node runtimes do not expose DOMMatrix before pdf.js loads.
@@ -52,6 +52,10 @@ export async function prepareDocument(input:InvoiceDocumentInput,env:NodeJS.Proc
     if(!Number.isInteger(pages)||pages<1)throw new DocumentError('DOCUMENT_CORRUPTED','PDF page count cannot be read');
     if(pages>maxPages)throw new DocumentError('DOCUMENT_TOO_LARGE',`PDF has ${pages} pages; limit is ${maxPages}`);
     if(rendered.pages.length!==pages||rendered.pages.some(page=>page.data.length===0))throw new DocumentError('PDF_RENDER_FAILED','Rendered page count differs from PDF page count');
-    return {pages:rendered.pages.map(page=>({pageNumber:page.pageNumber,mimeType:'image/png' as const,bytes:Buffer.from(page.data)})),mimeType,sizeBytes:input.bytes.length};
+    // Preserve the PDF text layer as a second signal for vision extraction.
+    // Scanned PDFs continue to use their rendered page images as before.
+    let text='';
+    try{text=(await parser.getText({first:1,last:maxPages})).text.trim().slice(0,24000)}catch(error){console.warn('Invoice PDF text extraction unavailable',error)}
+    return {pages:rendered.pages.map(page=>({pageNumber:page.pageNumber,mimeType:'image/png' as const,bytes:Buffer.from(page.data)})),mimeType,sizeBytes:input.bytes.length,...(text?{text}:{})};
   }finally{await parser.destroy().catch(()=>undefined)}
 }

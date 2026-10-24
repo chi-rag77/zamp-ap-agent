@@ -31,6 +31,7 @@ describe('serverless PDF preparation',()=>{
   expect(result.pages).toHaveLength(1);
   expect(result.pages[0].mimeType).toBe('image/png');
   expect(result.pages[0].bytes.subarray(0,8)).toEqual(Buffer.from([137,80,78,71,13,10,26,10]));
+  expect(result.text).toContain('Invoice 100');
   }finally{if(original)runtime.DOMMatrix=original}
  });
  it('enforces the configured page limit before rendering',async()=>{
