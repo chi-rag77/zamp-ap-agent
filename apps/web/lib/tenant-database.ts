@@ -4,12 +4,16 @@ import {getWorkOS, withAuth} from '@workos-inc/authkit-nextjs';
 import {decodeJwt} from 'jose';
 import {createServerClient} from '@zamp/database';
 import {workosAuthEnabled} from './workos-auth';
+import {redirect} from 'next/navigation';
 
 export type TenantDatabase = {db: SupabaseClient; organizationId: string; workosOrganizationId: string};
 
 /** Use the RLS-protected WorkOS client for interactive requests. */
 export async function createWebServerClient(): Promise<SupabaseClient> {
   if (!workosAuthEnabled()) return createServerClient();
+  const auth=await withAuth();
+  if(!auth.user)redirect('/login');
+  if(!auth.organizationId)redirect('/organization-setup');
   return (await createTenantDatabase()).db;
 }
 

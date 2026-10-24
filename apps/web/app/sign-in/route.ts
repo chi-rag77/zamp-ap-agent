@@ -1,10 +1,9 @@
-import {getSignInUrl} from '@workos-inc/authkit-nextjs';
+import {getSignInUrl,getWorkOS} from '@workos-inc/authkit-nextjs';
 import {NextRequest,NextResponse} from 'next/server';
 import {workosAuthEnabled} from '../../lib/workos-auth';
-import {getWorkOS} from '@workos-inc/authkit-nextjs';
 
 function safeReturnTo(value:string|null){return value?.startsWith('/')&&!value.startsWith('//')&&!value.includes('\\')?value:'/'}
-const personalEmailDomains=new Set(['gmail.com','googlemail.com','outlook.com','hotmail.com','live.com','yahoo.com','icloud.com','proton.me','protonmail.com']);
+function completionPath(returnTo:string){return `/auth/complete?returnTo=${encodeURIComponent(returnTo)}`}
 
 export async function GET(request:NextRequest){
   if(!workosAuthEnabled()){
@@ -13,18 +12,20 @@ export async function GET(request:NextRequest){
   const email=request.nextUrl.searchParams.get('email')?.trim().slice(0,320);
   let organizationId:string|undefined;
   if(email&&/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){
-    const domain=email.toLowerCase().split('@').pop()!;
     try{
-      const organizations=await getWorkOS().organizations.listOrganizations({domains:[domain],limit:100});
-      organizationId=organizations.data.find(item=>item.domains.some(entry=>entry.domain.toLowerCase()===domain&&entry.state==='verified'))?.id;
+      const workos=getWorkOS();
+      const users=await workos.userManagement.listUsers({email:email.toLowerCase(),limit:100});
+      const user=users.data.find(item=>item.email.toLowerCase()===email.toLowerCase());
+      if(user){
+        const memberships=await workos.userManagement.listOrganizationMemberships({userId:user.id,statuses:['active'],limit:100});
+        const memberOrganizationIds=new Set(memberships.data.map(item=>item.organizationId));
+        const preferred=process.env.ZAMP_WORKOS_ORGANIZATION_ID;
+        organizationId=preferred&&memberOrganizationIds.has(preferred)?preferred:memberships.data[0]?.organizationId;
+      }
     }catch{
       return NextResponse.redirect(new URL('/login?error=configuration',request.url));
     }
   }
-  // Keep the provisioned Acme tenant usable for the initial administrator's
-  // personal email. Unverified company domains must remain unscoped so a
-  // separate tenant can authenticate without being assigned to Acme.
-  const emailDomain=email?.toLowerCase().split('@').pop();
-  if(!organizationId&&(!emailDomain||personalEmailDomains.has(emailDomain)))organizationId=process.env.ZAMP_WORKOS_ORGANIZATION_ID||undefined;
-  return NextResponse.redirect(await getSignInUrl({...(organizationId?{organizationId}:{}),returnTo:safeReturnTo(request.nextUrl.searchParams.get('returnTo')),...(email?{loginHint:email}:{})}));
+  const returnTo=safeReturnTo(request.nextUrl.searchParams.get('returnTo'));
+  return NextResponse.redirect(await getSignInUrl({...(organizationId?{organizationId}:{}),returnTo:completionPath(returnTo),...(email?{loginHint:email}:{})}));
 }
