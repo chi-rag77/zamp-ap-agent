@@ -2,7 +2,6 @@ import {after,NextRequest,NextResponse} from 'next/server';
 import {createServerClient} from '@zamp/database';
 import {gmailMailbox,syncGmailMailbox,verifyPubSubJwt,EmailError} from '@zamp/email';
 import {dispatchAgentWorker} from '../../../../../lib/agent-worker';
-import {dispatchEmailSyncContinuation} from '../../../../../lib/email-sync-dispatch';
 
 export const runtime='nodejs';
 export const maxDuration=300;
@@ -22,14 +21,15 @@ export async function POST(request:NextRequest){
   if(error)throw error;
   after(async()=>{
    try{
-    const result=await syncGmailMailbox();
+    const started=Date.now();
+    let result=await syncGmailMailbox();
+    while(result.hasMore&&Date.now()-started<240_000)result=await syncGmailMailbox();
     if(result.hasMore){
-     if(data)await db.from('email_sync_jobs').update({status:'RUNNING'}).eq('id',data.id);
-     await dispatchEmailSyncContinuation(request.nextUrl.origin,data?.id);
-    }else{
-     if(data)await db.from('email_sync_jobs').update({status:'COMPLETED',completed_at:new Date().toISOString()}).eq('id',data.id);
-     await dispatchAgentWorker(request.nextUrl.origin);
+     if(data)await db.from('email_sync_jobs').update({status:'FAILED',last_error:'Full sync paused after 240 seconds; a manual sync can resume from the saved page.'}).eq('id',data.id);
+     return;
     }
+    if(data)await db.from('email_sync_jobs').update({status:'COMPLETED',completed_at:new Date().toISOString(),last_error:null}).eq('id',data.id);
+    await dispatchAgentWorker(request.nextUrl.origin);
    }catch(failure){
     if(data)await db.from('email_sync_jobs').update({status:'FAILED',last_error:failure instanceof Error?failure.message:'Sync failed'}).eq('id',data.id);
    }
