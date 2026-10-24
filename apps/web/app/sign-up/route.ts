@@ -6,7 +6,5 @@ export async function GET(){
   if(!workosAuthEnabled()){
     return new NextResponse('WorkOS sign-up is not enabled for this deployment.',{status:503,headers:{'Cache-Control':'no-store'}});
   }
-  const organizationId=process.env.ZAMP_WORKOS_ORGANIZATION_ID;
-  if(!organizationId)return new NextResponse('The Acme organization is not configured.',{status:503,headers:{'Cache-Control':'no-store'}});
-  return NextResponse.redirect(await getSignUpUrl({organizationId,returnTo:'/'}));
+  return NextResponse.redirect(await getSignUpUrl({returnTo:'/auth/complete?returnTo=%2F'}));
 }
