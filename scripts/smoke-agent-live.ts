@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
 import {existsSync} from 'node:fs';
 import {createServerClient} from '@zamp/database';
-import {runAgent} from '@zamp/agent';
+import {processNextAgentJob,runAgent} from '@zamp/agent';
 if(process.env.RUN_LIVE_AGENT_SMOKE!=='yes')throw new Error('Set RUN_LIVE_AGENT_SMOKE=yes to create labelled demo records');
 if(existsSync('.env.local'))process.loadEnvFile('.env.local');
 const db=createServerClient();let suffix=randomUUID().slice(0,8).toUpperCase();const today=new Date().toISOString().slice(0,10);
@@ -20,11 +20,12 @@ if(existingId){
  number=`INV-PH5-${suffix}`;
 }
 async function invoice(){const id=await insert('invoices',{invoice_number:number,vendor_id:vendorId,po_id:poId,source:'DEMO',invoice_date:today,currency:'INR',subtotal:'300.0000',tax:'54.0000',total:'354.0000',extraction_confidence:'0.9900',status:'RECEIVED'});await insert('invoice_lines',{invoice_id:id,line_number:1,sku:`PH5-${suffix}`,description:'Phase 5 smoke widget',quantity:'2.0000',unit_price:'150.0000',tax_rate:'0.180000',amount:'300.0000'});return id}
+async function runToCompletion(invoiceId:string){const queued=await runAgent(invoiceId);assert.equal(queued.status,'QUEUED');let run=await db.from('agent_runs').select('status,final_decision,verification_status,summary,id').eq('id',queued.runId).single();for(let attempt=0;attempt<80&&run.data?.status!=='COMPLETED'&&run.data?.status!=='WAITING'&&run.data?.status!=='FAILED';attempt++){await processNextAgentJob();run=await db.from('agent_runs').select('status,final_decision,verification_status,summary,id').eq('id',queued.runId).single();if(run.error)throw run.error;if(run.data?.status==='RUNNING')await new Promise(resolve=>setTimeout(resolve,250))}if(run.error||!run.data)throw run.error??new Error('Agent run missing');return run.data}
 let approvedRunId:string|null=null;
-if(!existingId){approvalId=await invoice();const approvalSimulation=await runAgent(approvalId,{mode:'SIMULATION'});assert.equal(approvalSimulation.decision,'AUTO_APPROVED',`Synthetic approval simulation: ${approvalSimulation.summary}`);const approved=await runAgent(approvalId);assert.equal(approved.status,'COMPLETED',approved.summary);assert.equal(approved.decision,'AUTO_APPROVED',approved.summary);assert.equal(approved.verificationStatus,'VERIFIED');approvedRunId=approved.runId}
+if(!existingId){approvalId=await invoice();const approvalSimulation=await runAgent(approvalId,{mode:'SIMULATION'});assert.equal(approvalSimulation.decision,'AUTO_APPROVED',`Synthetic approval simulation: ${approvalSimulation.summary}`);const approved=await runToCompletion(approvalId);assert.equal(approved.status,'COMPLETED',approved.summary);assert.equal(approved.final_decision,'AUTO_APPROVED',approved.summary);assert.equal(approved.verification_status,'VERIFIED');approvedRunId=approved.id}
 const duplicateId=await invoice();const rejectionSimulation=await runAgent(duplicateId,{mode:'SIMULATION'});
 assert.equal(rejectionSimulation.decision,'AUTO_REJECTED',`Synthetic duplicate simulation: ${rejectionSimulation.summary}`);
-const rejected=await runAgent(duplicateId);assert.equal(rejected.status,'COMPLETED',rejected.summary);assert.equal(rejected.decision,'AUTO_REJECTED',rejected.summary);assert.equal(rejected.verificationStatus,'VERIFIED');
+const rejected=await runToCompletion(duplicateId);assert.equal(rejected.status,'COMPLETED',rejected.summary);assert.equal(rejected.final_decision,'AUTO_REJECTED',rejected.summary);assert.equal(rejected.verification_status,'VERIFIED');
 const [approvedRow,rejectedRow]=await Promise.all([db.from('invoices').select('status,decision').eq('id',approvalId).single(),db.from('invoices').select('status,decision').eq('id',duplicateId).single()]);
 assert.equal(approvedRow.data?.status,'APPROVED');assert.equal(rejectedRow.data?.status,'REJECTED');
-console.log(JSON.stringify({fixture:suffix,approval:{invoiceId:approvalId,runId:approvedRunId,status:approvedRow.data?.status},rejection:{invoiceId:duplicateId,runId:rejected.runId,status:rejectedRow.data?.status}}));
+console.log(JSON.stringify({fixture:suffix,approval:{invoiceId:approvalId,runId:approvedRunId,status:approvedRow.data?.status},rejection:{invoiceId:duplicateId,runId:rejected.id,status:rejectedRow.data?.status}}));

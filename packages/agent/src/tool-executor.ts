@@ -5,7 +5,7 @@ import {assertLimits} from './planner';
 import {AgentError,errorCode} from './errors';
 import {finishStep,startStep,checkActive,incrementRetry} from './run-manager';
 import {retryTransient} from './retry';
-export async function executeTool<T=unknown>(context:AgentContext,name:string,rawInput:unknown,stepType:'READ'|'VALIDATION'|'POLICY'|'ACTION'|'VERIFICATION'|'AUDIT'='READ'):Promise<T>{
+export async function executeTool<T=unknown>(context:AgentContext,name:string,rawInput:unknown,stepType:'READ'|'AI'|'VALIDATION'|'POLICY'|'ACTION'|'VERIFICATION'|'AUDIT'='READ'):Promise<T>{
  await checkActive(context);assertLimits(context);const tool=getRegisteredTool(name);const parsed=tool.inputSchema.safeParse(rawInput);
  if(!parsed.success)throw new AgentError('TOOL_ARGUMENT_INVALID',parsed.error.message);
  assertToolPermission(tool.category,context);

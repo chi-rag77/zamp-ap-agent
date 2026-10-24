@@ -4,6 +4,7 @@ import {join} from 'node:path';
 import sharp from 'sharp';
 import {createServerClient} from '@zamp/database';
 import {processEmailMessage} from '@zamp/email';
+import {processNextAgentJob} from '@zamp/agent';
 process.env.AI_PROVIDER='mock';
 const source=await readFile(join(process.cwd(),'tests/fixtures/phase03-real-invoice.png'));
 const stamp=Date.now();
@@ -19,8 +20,9 @@ const {data:attachment,error:attachmentError}=await db.from('email_attachments')
 if(attachmentError)throw attachmentError;
 const {data:invoice,error:invoiceError}=await db.from('invoices').select('id,current_extraction_id,status').eq('id',attachment.invoice_id).single();
 if(invoiceError)throw invoiceError;
-const {data:agent,error:agentError}=await db.from('agent_runs').select('current_state,verification_status').eq('id',attachment.agent_run_id).single();
+for(let attempt=0;attempt<80;attempt++){const {data:run,error}=await db.from('agent_runs').select('status').eq('id',attachment.agent_run_id).single();if(error)throw error;if(['COMPLETED','WAITING','FAILED'].includes(run.status))break;await processNextAgentJob();await new Promise(resolve=>setTimeout(resolve,250))}
+const {data:agent,error:agentError}=await db.from('agent_runs').select('status,current_state,verification_status').eq('id',attachment.agent_run_id).single();
 if(agentError)throw agentError;
-const verified=result.status==='PROCESSED'&&result.invoicesCreated===1&&result.agentRunsTriggered===1&&attachment.document_status==='STORED'&&Boolean(invoice.current_extraction_id)&&agent.verification_status==='VERIFIED';
-console.log(JSON.stringify({messageId,status:result.status,invoiceId:invoice.id,invoiceStatus:invoice.status,agentState:agent.current_state,verified}));
+const verified=result.status==='PROCESSED'&&result.invoicesCreated===1&&result.agentRunsTriggered===1&&attachment.document_status==='STORED'&&Boolean(invoice.current_extraction_id)&&['COMPLETED','WAITING'].includes(agent.status)&&agent.verification_status==='VERIFIED';
+console.log(JSON.stringify({messageId,status:result.status,invoiceId:invoice.id,invoiceStatus:invoice.status,agentStatus:agent.status,agentState:agent.current_state,verified}));
 if(!verified)process.exitCode=1;
