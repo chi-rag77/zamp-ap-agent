@@ -1,4 +1,4 @@
-import {createServerClient} from '@zamp/database';
+import {createWebServerClient} from '../../lib/tenant-database';
 import {PolicyConfigurationSchema} from '@zamp/policy';
 import {Empty,LocalNotice} from '../../components/ui';
 import {localWorkspace} from '../../lib/data';
@@ -7,7 +7,7 @@ export const dynamic='force-dynamic';
 type PolicyRow={id:string;name:string;version:string;status:string;configuration:unknown;updated_at:string};
 export default async function RulesPage(){
   const enabled=localWorkspace();let row:PolicyRow|null=null;const counts={approved:0,review:0,rejected:0};
-  if(enabled){const db=createServerClient();const {data,error}=await db.from('policies').select('id,name,version,status,configuration,updated_at').eq('status','ACTIVE').limit(1).maybeSingle();if(error)throw new Error(error.message);row=data;
+  if(enabled){const db=await createWebServerClient();const {data,error}=await db.from('policies').select('id,name,version,status,configuration,updated_at').eq('status','ACTIVE').limit(1).maybeSingle();if(error)throw new Error(error.message);row=data;
     const since=new Date(Date.now()-30*86400000).toISOString();const decisions=await db.from('agent_decisions').select('decision').gte('created_at',since).limit(1000);if(decisions.error)throw new Error(decisions.error.message);for(const d of decisions.data??[]){if(d.decision==='AUTO_APPROVED')counts.approved++;else if(d.decision==='AUTO_REJECTED')counts.rejected++;else if(d.decision==='NEEDS_REVIEW')counts.review++}}
   const parsed=PolicyConfigurationSchema.safeParse(row?.configuration);const c=parsed.success?parsed.data:null;
   return <><div className="page-heading"><div><h1>Rules &amp; Policies</h1><p>The rules the agent applies before it decides, and when it must ask a human</p></div><div className="heading-actions"><Link className="button button-primary" href="/rules/import">✧ Import policy with AI</Link><span className="button">{row?`v${row.version} · active`:'No active policy'}</span></div></div><LocalNotice enabled={enabled}/>{!row||!c?<Empty title="No valid active policy" message="Policy evaluation remains closed until an active, valid configuration is available."/>:<><section className="rules-intro"><div><h2>{row.name} <span className="rules-version">v{row.version}</span></h2><p>All vendors · Goods and services invoices</p></div><p>Updated {new Date(row.updated_at).toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'})}</p></section><section className="rules-card"><div className="rules-card-head"><strong>Rules</strong><span>10 configured</span></div>

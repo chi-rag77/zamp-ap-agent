@@ -1,1 +1,1 @@
-{"name":"@zamp/web","version":"0.1.0","private":true,"type":"module"}
+{"name":"@zamp/web","version":"0.1.0","private":true,"type":"module","dependencies":{"@workos-inc/authkit-nextjs":"4.6.0","@workos-inc/node":"12.0.0"}}

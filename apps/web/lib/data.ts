@@ -1,5 +1,5 @@
 import 'server-only';
-import {createServerClient} from '@zamp/database';
+import {createWebServerClient} from './tenant-database';
 import type {InvoiceValidationResult} from '@zamp/matching';
 
 export const vercelWorkspaceEnabled=()=>process.env.VERCEL==='1'&&['preview','production'].includes(process.env.VERCEL_ENV??'')&&process.env.ZAMP_ENABLE_PROTECTED_WORKSPACE==='true';
@@ -19,7 +19,7 @@ const empty:Workspace={enabled:false,invoices:[],vendors:[],purchaseOrders:[],va
 function rows<T>(result:{data:T[]|null;error:{message:string}|null},name:string):T[]{if(result.error)throw new Error(`${name}: ${result.error.message}`);return result.data??[]}
 export async function loadWorkspace():Promise<Workspace>{
   if(!localWorkspace())return empty;
-  const db=createServerClient();
+  const db=await createWebServerClient();
   const [invoices,vendors,purchaseOrders,validations,decisions,extractions,audits,runs,agentRuns,reviews]=await Promise.all([
     db.from('invoices').select('*').is('archived_at',null).order('received_at',{ascending:false}).limit(200),
     db.from('vendors').select('id,vendor_code,legal_name,display_name,gstin,currency,status').is('archived_at',null).order('legal_name').limit(200),

@@ -1,12 +1,14 @@
 import {NextRequest} from 'next/server';
 import {createServerClient} from '@zamp/database';
 import {localWorkspace} from '../../../../../../lib/data';
+import {tenantCanAccess} from '../../../../../../lib/tenant-database';
 
 export const runtime='nodejs';
 export async function GET(request:NextRequest,{params}:{params:Promise<{id:string}>}){
   if(!localWorkspace())return new Response('Workspace unavailable',{status:403});
   const {id}=await params;
   if(!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id))return new Response('Invalid invoice ID',{status:400});
+  if(!await tenantCanAccess('invoices',id))return new Response('Document not found',{status:404});
   const db=createServerClient();
   const {data:document,error}=await db.from('invoice_documents').select('storage_path,mime_type,filename').eq('invoice_id',id).order('created_at',{ascending:false}).limit(1).maybeSingle();
   if(error||!document)return new Response('Document not found',{status:404});

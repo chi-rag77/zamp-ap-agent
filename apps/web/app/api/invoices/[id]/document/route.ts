@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { timingSafeEqual, createHash } from 'node:crypto';
 import { createServerClient } from '@zamp/database';
 import { validateDocument, DocumentError } from '@zamp/document';
+import {tenantCanAccess} from '../../../../../lib/tenant-database';
 
 export const runtime='nodejs';
 function authorized(request:NextRequest){
@@ -16,6 +17,7 @@ export async function POST(request:NextRequest,context:{params:Promise<{id:strin
   const {id}=await context.params;
   if(!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id))return NextResponse.json({success:false,error:{code:'INVALID_INVOICE_ID',message:'Invalid invoice ID'}},{status:400});
   try{
+    if(!await tenantCanAccess('invoices',id))return NextResponse.json({success:false,error:{code:'NOT_FOUND',message:'Invoice not found'}},{status:404});
     const file=(await request.formData()).get('file');
     if(!(file instanceof File))throw new DocumentError('DOCUMENT_NOT_FOUND','Upload a file in the file form field');
     const bytes=Buffer.from(await file.arrayBuffer());
