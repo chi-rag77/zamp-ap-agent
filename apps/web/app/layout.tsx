@@ -1,4 +1,5 @@
 import './globals.css';
+import './base44-listings.css';
 import {Inter,Plus_Jakarta_Sans} from 'next/font/google';
 import {Shell} from '../components/shell';
 import {vercelWorkspaceEnabled} from '../lib/data';

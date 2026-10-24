@@ -1,6 +1,6 @@
 import {PageHeading,LocalNotice} from '../../components/ui';
 import {UploadButton} from '../../components/upload-button';
-import {ExportInvoices,InvoiceTable,type InvoiceView} from '../../components/invoice-table';
+import {InvoiceTable,type InvoiceView} from '../../components/invoice-table';
 import {day,invoiceDisplayStatus,latestDecision,latestValidation,loadWorkspace,money,percent,poNumber,vendorName} from '../../lib/data';
 import {WorkspaceBrief} from '../../components/workspace-brief';
 
@@ -10,7 +10,7 @@ export default async function InvoicesPage({searchParams}:{searchParams:Promise<
   const params=await searchParams;
   const view=params.view;
   const initialSearch=params.q??'';
-  const initialTab=view==='review'?'Needs review':view==='approved'?'Approval eligible':view==='rejected'?'Rejection eligible':'All';
+  const initialTab=view==='review'?'Needs review':view==='approved'?'Auto approved':view==='rejected'?'Rejected':'All';
   const rows:InvoiceView[]=w.invoices.map(invoice=>{
     const v=latestValidation(w,invoice.id);const policy=latestDecision(w,invoice.id);
     const price=v?.result?.checks?.find(c=>c.check==='PRICE_MATCH'&&c.status==='FAIL');
@@ -19,5 +19,5 @@ export default async function InvoicesPage({searchParams}:{searchParams:Promise<
   const needsReview=rows.filter(row=>row.status==='NEEDS REVIEW'||row.status==='VALIDATION ISSUE').length;
   const lowConfidence=rows.filter(row=>row.confidence!=='—'&&Number.parseFloat(row.confidence)<90).length;
   const summary=needsReview?`${needsReview} ${needsReview===1?'invoice needs':'invoices need'} your review before the agent can continue.`:'No invoices are currently waiting for a human review.';
-  return <><PageHeading title="Invoices" subtitle="Every invoice processed by the AP Agent" actions={<><ExportInvoices rows={rows}/><UploadButton/></>}/><LocalNotice enabled={w.enabled}/><WorkspaceBrief summary={summary} stats={[["in queue",rows.length],["need review",needsReview],["low confidence",lowConfidence]]}/><InvoiceTable key={`${initialTab}-${initialSearch}`} rows={rows} initialTab={initialTab} initialSearch={initialSearch}/></>;
+  return <><PageHeading title="Invoices" subtitle="Every invoice processed by the AP Agent"/><LocalNotice enabled={w.enabled}/><WorkspaceBrief summary={summary} stats={[["in queue",rows.length],["need review",needsReview],["low confidence",lowConfidence]]}/><InvoiceTable key={`${initialTab}-${initialSearch}`} rows={rows} initialTab={initialTab} initialSearch={initialSearch} compactUploadAction={<UploadButton compact/>} uploadAction={<UploadButton/>}/></>;
 }

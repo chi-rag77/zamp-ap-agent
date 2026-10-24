@@ -1,0 +1,90 @@
+/* Invoice list and shared shell details aligned to the Base44 reference. */
+.button-primary{background:#2864f4;border-color:#2864f4;color:#fff}
+.button-primary:hover{background:#1f59e8;border-color:#1f59e8;color:#fff}
+.ic-primary{background:#2864f4;border-color:#2864f4;color:#fff}
+.ic-primary:hover{background:#1f59e8;border-color:#1f59e8;color:#fff}
+.invoice-list-tabs{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:end;gap:12px;border-bottom:1px solid #dfe6f0;margin:0 0 13px}
+.invoice-list-tabs>.tabs{display:flex;align-items:center;gap:22px;min-width:0;margin:0;border:0;overflow-x:auto}
+.invoice-list-tabs .tab{padding:8px 0 10px;border:0;border-radius:0;background:transparent;color:#71839d;font-size:12px;white-space:nowrap}
+.invoice-list-tabs .tab.active{border-bottom:2px solid #2d68f4;color:#2e3a4c;background:transparent;font-weight:650}
+.invoice-list-tabs .tab-count{margin-left:4px;background:transparent;color:#77879d;padding:0}
+.invoice-view-actions{position:relative;display:flex;align-items:center;gap:8px;padding-bottom:6px}
+.invoice-view-button{height:30px;min-height:30px;border-radius:9px;font-size:11px}
+.upload-compact{min-width:30px;width:30px;height:30px;min-height:30px;padding:0;border-radius:9px;font-size:20px;font-weight:400;line-height:1}
+.invoice-views-holder{position:relative}
+.invoice-views-popover,.invoice-more-menu{position:absolute;z-index:15;right:0;top:calc(100% + 7px);min-width:210px;padding:8px;border:1px solid #dce5f1;border-radius:10px;background:#fff;box-shadow:0 10px 28px #20395822}
+.invoice-views-popover>strong{display:block;padding:7px 8px;font-size:11px}
+.invoice-views-popover p{padding:7px 8px;margin:0;color:#7a8aa1;font-size:10px}
+.invoice-views-popover button,.invoice-more-menu button{width:100%;display:flex;align-items:center;gap:8px;padding:9px 8px;border:0;border-radius:7px;background:#fff;text-align:left;font-size:11px;color:#34445b}
+.invoice-views-popover button:hover,.invoice-more-menu button:hover{background:#f3f7fd}
+.invoice-views-popover small{display:block;color:#7a8aa1;font-size:9px}
+.invoice-list-panel{border-radius:10px;box-shadow:0 1px 3px #17355308;overflow:hidden}
+.invoice-list-toolbar{display:flex;align-items:center;gap:8px;padding:10px 12px;border-bottom:1px solid #e1e7ef}
+.invoice-list-toolbar .search-box{width:min(100%,260px);height:33px;flex:none}
+.invoice-list-toolbar .filter-sort-button{height:33px;min-height:33px;border-radius:8px}
+.filter-active-count{display:grid;place-items:center;width:17px;height:17px;border-radius:50%;background:#e8f0ff;color:#2762d9;font-size:9px}
+.invoice-more-wrap{position:relative}
+.invoice-more-button{height:33px;min-height:33px;width:34px;padding:0;font-size:13px;letter-spacing:1px;color:#70819a}
+.invoice-more-menu{min-width:160px}
+.invoice-list-toolbar .table-count{margin-left:auto;color:#71839d;font-size:11px;white-space:nowrap}
+.invoice-upload-slot .button{min-height:33px;border-radius:9px;font-size:11px}
+.invoice-data-table{min-width:1120px}
+.invoice-data-table th{height:39px;padding-top:9px;padding-bottom:9px;font-size:10px;letter-spacing:.1em}
+.invoice-data-table td{height:47px;padding-top:10px;padding-bottom:10px;font-size:11px;white-space:nowrap}
+.invoice-data-table .badge{border-radius:20px;padding:4px 9px;font-size:9px}
+.invoice-po-chip{display:inline-block;padding:3px 8px;border:1px solid #e1e8f2;border-radius:20px;background:#f5f8fc;color:#4b5c73}
+.invoice-variance{color:#73849d}.invoice-variance.warning{color:#a66b13}.invoice-variance.danger{color:#b4483d}
+.confidence-value.high i b{background:#29a56a}.confidence-value.medium i b{background:#d29319}.confidence-value.low i b{background:#d44d42}
+.filter-drawer-overlay{position:fixed;z-index:60;inset:0;background:rgba(12,15,22,.82);display:flex;justify-content:flex-end}
+.filter-drawer{width:min(100%,560px);height:100%;background:#f7f9fc;display:flex;flex-direction:column;box-shadow:-10px 0 35px #11182722}
+.filter-drawer>header{height:48px;flex:none;padding:0 18px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #e0e6ee;background:#fff}
+.filter-drawer>header h2{font-size:13px;margin:0;font-weight:650}
+.filter-drawer>header button{display:grid;place-items:center;width:29px;height:29px;border:0;background:none;color:#6b7d96}
+.filter-drawer-tabs{display:flex;align-self:flex-start;margin:8px 18px 10px;padding:3px;border:1px solid #dce5f0;border-radius:14px;background:#eef3fa}
+.filter-drawer-tabs button{border:0;border-radius:11px;padding:5px 13px;background:transparent;color:#75859b;font-size:10px}
+.filter-drawer-tabs button.active{background:#e2eeff;color:#2866ec}
+.filter-find{display:flex;align-items:center;gap:9px;height:36px;flex:none;margin:0 18px 8px;padding:0 11px;border:1px solid #dce5ef;border-radius:9px;background:#fff;color:#73849a}
+.filter-find input{width:100%;border:0;outline:0;background:transparent;color:#34445b;font-size:11px}
+.filter-drawer-list{overflow:auto;flex:1;background:#f7f9fc}
+.filter-drawer-item{border-bottom:1px solid #e2e8f0;background:#f7f9fc}
+.filter-drawer-item.expanded{background:#fff}
+.filter-drawer-item>button{width:100%;min-height:57px;display:flex;align-items:center;gap:11px;padding:9px 18px;border:0;background:transparent;text-align:left;color:#3a485c}
+.filter-icon{width:25px;height:25px;flex:none;display:grid;place-items:center;border:1px solid #e1e8f1;border-radius:50%;background:#f0f4f9;color:#7488a3;font-size:13px}
+.filter-drawer-item>button>span:nth-child(2){flex:1}
+.filter-drawer-item strong,.filter-drawer-item small{display:block}
+.filter-drawer-item strong{font-size:11px;font-weight:600}
+.filter-drawer-item small{margin-top:1px;color:#7a8ba2;font-size:9px}
+.filter-drawer-item>button>b{color:#8192a9;font-size:16px;font-weight:400}
+.filter-drawer-item>select{width:calc(100% - 54px);height:34px;margin:0 18px 12px 54px;padding:0 9px;border:1px solid #dbe5f1;border-radius:7px;background:#fff;color:#34445b;font-size:11px}
+.filter-amount-fields{display:flex;gap:10px;padding:0 18px 13px 54px}
+.filter-amount-fields label{flex:1;color:#73849b;font-size:10px}
+.filter-amount-fields input{display:block;width:100%;height:33px;margin-top:4px;padding:0 9px;border:1px solid #dbe5f1;border-radius:7px;font-size:11px}
+.sort-drawer-content{padding:6px 18px;overflow:auto;flex:1}
+.sort-drawer-content>p{margin:4px 0 8px;color:#77889f;font-size:10px}
+.sort-drawer-content>button{width:100%;display:flex;justify-content:space-between;padding:12px 10px;border:0;border-bottom:1px solid #e3e9f1;background:transparent;color:#35445a;text-align:left;font-size:11px}
+.sort-drawer-content>button.selected{color:#2a65e8}
+.sort-direction{display:flex;gap:8px;margin-top:17px}
+.sort-direction button{flex:1;padding:9px;border:1px solid #dce5f0;border-radius:8px;background:#fff;color:#566983;font-size:10px}
+.sort-direction button.selected{border-color:#9bbcf6;background:#edf4ff;color:#2864e9}
+.filter-drawer-footer{min-height:55px;flex:none;display:flex;align-items:center;gap:8px;padding:8px 18px;border-top:1px solid #dfe6ef;background:#fff}
+.filter-drawer-footer .filter-reset{border:0;background:none;color:#6e8098;font-size:10px}
+.filter-drawer-footer .filter-footer-spacer{flex:1}
+.filter-drawer-footer small{color:#71839d;font-size:9px}
+.filter-drawer-footer .button{height:33px;min-height:33px;font-size:10px}
+.sidebar-brand .brand-mark{flex:none;min-width:27px;overflow:visible;line-height:1}
+.sidebar nav .nav-heading{display:block;border-top:1px solid #dfe6ef;margin:12px 2px 5px;padding:11px 12px 0}
+.sidebar nav .nav-heading:first-child{border-top:0;margin-top:7px;padding-top:0}
+.app-shell.sidebar-collapsed .sidebar{width:76px}
+.app-shell.sidebar-collapsed .sidebar-brand{height:57px;padding:0 3px;gap:5px;justify-content:center;overflow:visible}
+.app-shell.sidebar-collapsed .sidebar-brand .brand-mark{width:26px;min-width:26px;height:30px;border-radius:7px;font-size:15px}
+.app-shell.sidebar-collapsed .sidebar-close{width:30px;height:30px;min-width:30px;margin:0;border-radius:50%;flex:none}
+.app-shell.sidebar-collapsed .sidebar nav{padding:4px 8px;overflow:visible}
+.app-shell.sidebar-collapsed .sidebar nav .nav-heading{display:block;height:1px;margin:9px 0;padding:0;border:0;background:#dfe6ef;font-size:0;line-height:0}
+.app-shell.sidebar-collapsed .nav-item{position:relative;justify-content:center;width:46px;height:44px;min-height:44px;margin:2px auto;padding:0;border-radius:10px}
+.app-shell.sidebar-collapsed .nav-item svg{width:19px;height:19px}
+.app-shell.sidebar-collapsed .nav-item:hover{background:#edf4ff;color:#2865f4}
+.app-shell.sidebar-collapsed .nav-item:focus-visible{z-index:30}
+.app-shell.sidebar-collapsed .topbar{margin-left:76px;width:calc(100% - 76px)}
+.app-shell.sidebar-collapsed .page-container{margin-left:76px}
+@media(max-width:1050px){.invoice-list-tabs{grid-template-columns:minmax(0,1fr) auto}.invoice-list-tabs>.tabs{gap:14px}.invoice-data-table{min-width:1080px}}
+@media(max-width:700px){.invoice-list-tabs{align-items:end;grid-template-columns:minmax(0,1fr) auto}.invoice-list-tabs>.tabs{gap:14px;max-width:calc(100vw - 108px)}.invoice-view-button{font-size:0;width:30px;padding:0}.invoice-list-toolbar{flex-wrap:wrap}.invoice-list-toolbar .search-box{width:calc(100% - 150px)}.invoice-list-toolbar .table-count{margin-left:auto}.invoice-upload-slot{width:100%}.invoice-upload-slot .button{width:100%}.filter-drawer{width:min(100%,480px)}.filter-drawer-footer{padding:8px 10px}.filter-drawer-footer .button{padding:6px 8px}.app-shell.sidebar-collapsed .sidebar{width:248px}.app-shell.sidebar-collapsed .sidebar-brand{padding:0 16px;justify-content:initial}.app-shell.sidebar-collapsed .sidebar-brand>strong,.app-shell.sidebar-collapsed .sidebar-app-badge,.app-shell.sidebar-collapsed .workspace-picker,.app-shell.sidebar-collapsed .nav-heading,.app-shell.sidebar-collapsed .nav-item span,.app-shell.sidebar-collapsed .sidebar-footer{display:initial}.app-shell.sidebar-collapsed .nav-item{justify-content:flex-start;width:auto;height:auto;padding:8px 12px}.app-shell.sidebar-collapsed .sidebar nav .nav-heading{height:auto;margin:12px 12px 5px;padding:11px 0 0;background:none;font-size:10px;line-height:normal;border-top:1px solid #dfe6ef}}
