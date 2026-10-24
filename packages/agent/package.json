@@ -1,1 +1,1 @@
-{"name":"@zamp/agent","version":"0.5.0","private":true,"type":"module","exports":"./src/index.ts","dependencies":{"@zamp/database":"0.1.0","@zamp/matching":"0.3.0","@zamp/policy":"0.4.0","zod":"4.1.11"}}
+{"name":"@zamp/agent","version":"0.5.0","private":true,"type":"module","exports":"./src/index.ts","dependencies":{"@zamp/ai":"0.2.0","@zamp/database":"0.1.0","@zamp/matching":"0.3.0","@zamp/policy":"0.4.0","zod":"4.1.11"}}

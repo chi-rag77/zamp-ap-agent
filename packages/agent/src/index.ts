@@ -1,4 +1,5 @@
 export {runAgent} from './runtime';
+export {processNextAgentJob} from './durable-runtime';
 export {startAgentRun,getRun,cancelRun} from './run-manager';
 export {getRegisteredTool,tools} from './tool-registry';
 export {assertTransition,isTerminal} from './state-machine';
