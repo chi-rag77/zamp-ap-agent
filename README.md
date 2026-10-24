@@ -38,7 +38,7 @@ NVIDIA model availability, input limits, and structured-output support depend on
 
 ## Document support
 
-`packages/document` checks the file signature against its MIME type and enforces `MAX_INVOICE_FILE_SIZE_MB=20`. It reads PNG and JPEG with `sharp`, corrects orientation, and keeps full resolution. PDF rendering uses `pdfinfo` and `pdftoppm` (Poppler), with `MAX_INVOICE_PAGES=20`, 150 DPI PNG output, and deterministic page order. Install Poppler on any deployment host. Temporary PDF files and rendered pages are removed after processing. The private `invoice-documents` Supabase Storage bucket accepts PDF, PNG, and JPEG.
+`packages/document` checks the file signature against its MIME type and enforces `MAX_INVOICE_FILE_SIZE_MB=20`. It reads PNG and JPEG with `sharp`, corrects orientation, and keeps full resolution. PDF page counting and rendering use the pinned `pdf-parse`/PDF.js runtime, with `MAX_INVOICE_PAGES=20`, 1240-pixel page width, and deterministic page order; this works in serverless deployments without a system Poppler install. The private `invoice-documents` Supabase Storage bucket accepts PDF, PNG, and JPEG.
 
 ## Extraction schema and persistence
 
@@ -133,7 +133,7 @@ The Phase 01 seed remains in `supabase/seed.sql` for local Docker resets. It con
 | Model unavailable | Confirm `NVIDIA_MODEL` with the provider `health()` method and NVIDIA's current model list. |
 | `EXTRACTION_JSON_INVALID` / incomplete | Verify model JSON support and output token capacity. Raw response is retained in extraction history on failure. |
 | `UNSUPPORTED_DOCUMENT_TYPE` | Upload PDF, PNG, or JPEG with a matching file signature. |
-| `PDF_RENDER_FAILED` | Install Poppler (`pdftoppm` and `pdfinfo`) on the server. |
+| `PDF_RENDER_FAILED` | Confirm the PDF opens correctly and stays within the configured page and size limits. |
 | Supabase permission error | Confirm the project server secret in `.env.local`; browser publishable keys cannot read protected tables. |
 
 ## Checks and limits
