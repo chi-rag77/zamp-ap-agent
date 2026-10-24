@@ -1,5 +1,5 @@
 import {notFound} from 'next/navigation';
-import {createServerClient} from '@zamp/database';
+import {createWebServerClient} from '../../../lib/tenant-database';
 import {InvoiceCase} from '../../../components/invoice-case';
 import {day,invoiceDisplayStatus,latestValidation,loadWorkspace,localWorkspace,money,percent,poNumber,vendorName} from '../../../lib/data';
 
@@ -9,7 +9,7 @@ export default async function InvoiceCasePage({params}:{params:Promise<{id:strin
   if(!localWorkspace()||!/^[0-9a-f-]{36}$/i.test(id))notFound();
   const w=await loadWorkspace(),invoice=w.invoices.find(i=>i.id===id);
   if(!invoice)notFound();
-  const db=createServerClient();
+  const db=await createWebServerClient();
   const validation=latestValidation(w,id)?.result??null;
   const matchedPO=w.purchaseOrders.find(p=>p.id===(validation?.purchaseOrder.poId??invoice.po_id));
   const [linesResult,documentResult,stepsResult,decisionResult,poLinesResult,receiptsResult]=await Promise.all([

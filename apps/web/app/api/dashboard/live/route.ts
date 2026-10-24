@@ -1,11 +1,11 @@
 import {NextRequest,NextResponse} from 'next/server';
-import {createServerClient} from '@zamp/database';
+import {createWebServerClient} from '../../../../lib/tenant-database';
 import {allowed,denied,failed} from '../../../../lib/agent-api';
 export const runtime='nodejs';export const dynamic='force-dynamic';
 export async function GET(request:NextRequest){
  if(!allowed(request))return denied();
  try{
-  const db=createServerClient(),since=new Date(Date.now()-30*86400000).toISOString(),today=new Date();today.setHours(0,0,0,0);const todayIso=today.toISOString();
+  const db=await createWebServerClient(),since=new Date(Date.now()-30*86400000).toISOString(),today=new Date();today.setHours(0,0,0,0);const todayIso=today.toISOString();
   const [active,queued,review,invoicesToday,approvedToday,rejectedToday,reviewToday,history,lastSuccess]=await Promise.all([
    db.from('agent_runs').select('id',{count:'exact',head:true}).in('status',['QUEUED','RUNNING']),
    db.from('agent_runs').select('id',{count:'exact',head:true}).eq('status','QUEUED'),

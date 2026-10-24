@@ -5,6 +5,8 @@ import {validateDocument,DocumentError} from '@zamp/document';
 import {extractInvoiceDocument,NvidiaVisionProvider,MockVisionProvider} from '@zamp/ai';
 import {validateInvoice} from '@zamp/matching';
 import {localWorkspace} from '../../../../lib/data';
+import {createTenantDatabase} from '../../../../lib/tenant-database';
+import {workosAuthEnabled} from '../../../../lib/workos-auth';
 
 export const runtime='nodejs';
 export const maxDuration=300;
@@ -17,7 +19,8 @@ export async function POST(request:NextRequest){
     const bytes=Buffer.from(await file.arrayBuffer());
     const mime=validateDocument({bytes,mimeType:file.type,filename:file.name});
     const db=createServerClient();
-    const {data:invoice,error:createError}=await db.from('invoices').insert({source:'UPLOAD',currency:'INR',status:'RECEIVED'}).select('id').single();
+    const organizationId=workosAuthEnabled()?(await createTenantDatabase()).organizationId:undefined;
+    const {data:invoice,error:createError}=await db.from('invoices').insert({source:'UPLOAD',currency:'INR',status:'RECEIVED',...(organizationId?{organization_id:organizationId}:{})}).select('id').single();
     if(createError||!invoice)throw new Error(`Invoice creation failed: ${createError?.message??'empty response'}`);
     const createdId=invoice.id as string;
     invoiceId=createdId;

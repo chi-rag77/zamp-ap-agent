@@ -1,5 +1,5 @@
 import {NextRequest,NextResponse} from 'next/server';
-import {createServerClient} from '@zamp/database';
+import {createWebServerClient} from '../../../../lib/tenant-database';
 import {allowed,denied,failed} from '../../../../lib/agent-api';
 export const runtime='nodejs';
 export const dynamic='force-dynamic';
@@ -8,7 +8,7 @@ export async function GET(request:NextRequest){
   const after=request.nextUrl.searchParams.get('after')??'0';
   if(!/^\d{1,18}$/.test(after))return NextResponse.json({error:'Invalid event cursor'},{status:400});
   try{
-    const {data,error}=await createServerClient().from('processing_events')
+    const {data,error}=await (await createWebServerClient()).from('processing_events')
       .select('id,sequence,event_type,invoice_id,run_id,step_name,status,message,metadata,created_at')
       .gt('sequence',after).order('sequence',{ascending:true}).limit(100);
     if(error)throw error;

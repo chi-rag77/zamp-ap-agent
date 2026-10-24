@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import {createServerClient} from '@zamp/database';
+import {createWebServerClient} from '../lib/tenant-database';
 import {Badge,Empty,LocalNotice} from '../components/ui';
 import {Icon} from '../components/shell';
 import {UploadButton} from '../components/upload-button';
@@ -18,7 +18,7 @@ function barRate(value:number){return `${Math.max(0,Math.min(100,value))}%`}
 
 export default async function Home(){
   const [w,agentHealth]=await Promise.all([loadWorkspace(),getAgentHealth()]);
-  const policyResult=w.enabled?await createServerClient().from('policies').select('name,version,configuration').eq('status','ACTIVE').limit(1).maybeSingle():{data:null,error:null};
+  const policyResult=w.enabled?await (await createWebServerClient()).from('policies').select('name,version,configuration').eq('status','ACTIVE').limit(1).maybeSingle():{data:null,error:null};
   const config=(policyResult.data?.configuration??{}) as {autoApproval?:Record<string,unknown>;rejection?:Record<string,unknown>};
   const auto=config.autoApproval??{};
   const invoices=w.invoices;

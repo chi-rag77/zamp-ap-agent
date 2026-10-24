@@ -3,6 +3,7 @@ import { timingSafeEqual } from 'node:crypto';
 import { createServerClient } from '@zamp/database';
 import { extractInvoiceDocument, ExtractionError, MockVisionProvider, NvidiaVisionProvider } from '@zamp/ai';
 import { DocumentError } from '@zamp/document';
+import {tenantCanAccess} from '../../../../../lib/tenant-database';
 
 export const runtime='nodejs';
 export const maxDuration=300;
@@ -18,6 +19,7 @@ export async function POST(request:NextRequest,context:{params:Promise<{id:strin
   const {id}=await context.params;
   if(!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id))return NextResponse.json({success:false,error:{code:'INVALID_INVOICE_ID',message:'Invalid invoice ID'}},{status:400});
   try{
+    if(!await tenantCanAccess('invoices',id))return NextResponse.json({success:false,error:{code:'NOT_FOUND',message:'Invoice not found'}},{status:404});
     const db=createServerClient();
     const {data:record,error:recordError}=await db.from('invoice_documents').select('storage_path,filename,mime_type').eq('invoice_id',id).order('created_at',{ascending:false}).limit(1).maybeSingle();
     if(recordError)throw recordError;

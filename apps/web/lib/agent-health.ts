@@ -1,5 +1,5 @@
 import 'server-only';
-import {createServerClient} from '@zamp/database';
+import {createWebServerClient} from './tenant-database';
 import {localWorkspace} from './data';
 
 export type AgentHealthStatus='ONLINE'|'DEGRADED';
@@ -12,7 +12,7 @@ export async function getAgentHealth():Promise<AgentHealth>{
   if(!process.env.AGENT_WORKER_SECRET&&!process.env.CRON_SECRET)return {status:'DEGRADED',checkedAt,message:'Agent worker is not configured'};
   if(process.env.AI_PROVIDER==='mock'&&process.env.NODE_ENV==='production'||process.env.AI_PROVIDER!=='mock'&&!process.env.NVIDIA_API_KEY)return {status:'DEGRADED',checkedAt,message:'Invoice extraction is not configured'};
   try{
-    const db=createServerClient();
+    const db=await createWebServerClient();
     const [policy,runs]=await Promise.all([
       db.from('policies').select('id').eq('status','ACTIVE').limit(1).maybeSingle(),
       db.from('agent_runs').select('id').order('created_at',{ascending:false}).limit(1).maybeSingle()

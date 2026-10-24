@@ -1,12 +1,12 @@
 import Link from 'next/link';
 import {notFound} from 'next/navigation';
-import {createServerClient} from '@zamp/database';
+import {createWebServerClient} from '../../../../lib/tenant-database';
 import {AgentRunControls} from '../../../../components/agent-run-controls';
 import {Badge,PageHeading,Panel} from '../../../../components/ui';
 import {day,localWorkspace} from '../../../../lib/data';
 export const dynamic='force-dynamic';
 export default async function AgentRunPage({params}:{params:Promise<{runId:string}>}){
- const {runId}=await params;if(!localWorkspace()||!/^[0-9a-f-]{36}$/i.test(runId))notFound();const db=createServerClient();
+ const {runId}=await params;if(!localWorkspace()||!/^[0-9a-f-]{36}$/i.test(runId))notFound();const db=await createWebServerClient();
  const [runResult,stepsResult,actionsResult,linkResult]=await Promise.all([db.from('agent_runs').select('*').eq('id',runId).maybeSingle(),db.from('agent_run_steps').select('id,step_number,step_type,name,status,duration_ms,error_code,error_class,started_at,completed_at').eq('run_id',runId).order('step_number'),db.from('agent_actions').select('id,action_type,status,guard_result,error_code,requested_at,verified_at').eq('run_id',runId).order('requested_at'),db.from('agent_run_decisions').select('decision_id').eq('agent_run_id',runId).maybeSingle()]);
  if(runResult.error||!runResult.data||stepsResult.error||actionsResult.error||linkResult.error)notFound();const run=runResult.data;
  const [eventResult,invoiceResult]=await Promise.all([db.from('processing_events').select('id,event_type,status,message,step_name,metadata,created_at').eq('run_id',runId).order('sequence',{ascending:false}).limit(100),db.from('invoices').select('invoice_number,vendor_id').eq('id',run.invoice_id).maybeSingle()]);if(eventResult.error)notFound();
