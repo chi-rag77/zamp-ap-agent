@@ -47,7 +47,7 @@ export async function prepareDocument(input:InvoiceDocumentInput,env:NodeJS.Proc
   try{
     let pages:number;
     try{pages=(await parser.getInfo()).total;if(!Number.isInteger(pages)||pages<1)throw new Error('Invalid PDF page count')}
-    catch{throw new DocumentError('DOCUMENT_CORRUPTED','PDF page count cannot be read')}
+    catch(error){console.error('Invoice PDF metadata parsing failed',error);throw new DocumentError('DOCUMENT_CORRUPTED','PDF page count cannot be read')}
     if(pages>maxPages)throw new DocumentError('DOCUMENT_TOO_LARGE',`PDF has ${pages} pages; limit is ${maxPages}`);
     let rendered;
     try{rendered=await parser.getScreenshot({first:pages,desiredWidth:1240,imageBuffer:true,imageDataUrl:false})}
