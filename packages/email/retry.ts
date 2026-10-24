@@ -1,0 +1,1 @@
+export async function withRetry<T>(fn:()=>Promise<T>,attempts=3,delayMs=350):Promise<T>{let last:unknown;for(let i=0;i<attempts;i++){try{return await fn()}catch(error){last=error;if(!(error instanceof Error&&'transient' in error&&error.transient===true)||i===attempts-1)throw error;await new Promise(resolve=>setTimeout(resolve,delayMs*2**i+Math.random()*100))}}throw last}

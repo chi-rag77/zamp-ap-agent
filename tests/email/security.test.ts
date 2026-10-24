@@ -1,0 +1,5 @@
+import {describe,it,expect} from 'vitest';
+import {sanitizeFilename,validateAttachment} from '../../packages/email/security';
+import {EmailError} from '../../packages/email/errors';
+const pdf=Buffer.from('%PDF-1.4\n1 0 obj\n');
+describe('email attachment security',()=>{it('sanitizes traversal and hashes a valid document',()=>{expect(sanitizeFilename('../../../../invoice.pdf')).toBe('invoice.pdf');const result=validateAttachment(pdf,'application/pdf','invoice.pdf');expect(result.sha256).toMatch(/^[a-f0-9]{64}$/)});it('rejects executable content disguised as PDF',()=>{expect(()=>validateAttachment(Buffer.from('MZ executable'),'application/pdf','invoice.pdf')).toThrow(EmailError)});it('rejects extension and MIME disagreements',()=>{expect(()=>validateAttachment(pdf,'image/png','invoice.pdf')).toThrow('differ')});it('rejects unsupported and oversized files',()=>{expect(()=>validateAttachment(pdf,'application/pdf','invoice.exe')).toThrow('Unsupported');expect(()=>validateAttachment(Buffer.alloc(16*1024*1024),'application/pdf','invoice.pdf')).toThrow('size limit')})});

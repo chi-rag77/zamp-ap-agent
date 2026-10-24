@@ -23,7 +23,11 @@
     "smoke:live": "tsx scripts/smoke-live.ts",
     "dev": "WATCHPACK_POLLING=true node scripts/next-with-env.mjs dev apps/web --webpack",
     "start": "node scripts/next-with-env.mjs start apps/web",
-    "policy:invoice": "node --import tsx scripts/evaluate-policy.ts"
+    "policy:invoice": "node --import tsx scripts/evaluate-policy.ts",
+    "email:sync": "node --import tsx scripts/email-sync.ts",
+    "email:watch": "node --import tsx scripts/email-watch.ts",
+    "email:test": "vitest run tests/email",
+    "test:e2e": "node --import tsx scripts/smoke-email-live.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "2.76.1",

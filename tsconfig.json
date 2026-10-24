@@ -45,6 +45,9 @@
       ],
       "@zamp/policy-import": [
         "./packages/policy-import/src/index.ts"
+      ],
+      "@zamp/email": [
+        "./packages/email/index.ts"
       ]
     }
   },

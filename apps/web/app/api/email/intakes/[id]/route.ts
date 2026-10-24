@@ -1,0 +1,5 @@
+import {NextRequest,NextResponse} from 'next/server';
+import {createServerClient} from '@zamp/database';
+import {emailAdmin,uuid} from '../../../../../lib/email-api';
+export const runtime='nodejs';
+export async function GET(request:NextRequest,{params}:{params:Promise<{id:string}>}){if(!emailAdmin(request))return NextResponse.json({error:'Unauthorized'},{status:401});const {id}=await params;if(!uuid(id))return NextResponse.json({error:'Invalid ID'},{status:400});const db=createServerClient();const [intake,attachments]=await Promise.all([db.from('email_intakes').select('*').eq('id',id).maybeSingle(),db.from('email_attachments').select('id,filename,mime_type,size_bytes,document_status,document_role,rejection_reason,invoice_id,agent_run_id').eq('email_intake_id',id)]);if(intake.error||attachments.error)return NextResponse.json({error:intake.error?.message??attachments.error?.message},{status:500});return intake.data?NextResponse.json({intake:intake.data,attachments:attachments.data}):NextResponse.json({error:'Not found'},{status:404})}

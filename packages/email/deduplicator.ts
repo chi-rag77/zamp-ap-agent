@@ -1,0 +1,2 @@
+import type {SupabaseClient} from '@supabase/supabase-js';
+export async function findDuplicate(db:SupabaseClient,hash:string,currentAttachmentId:string){const {data,error}=await db.from('email_attachments').select('id,invoice_id').eq('document_hash',hash).eq('document_role','INVOICE').eq('document_status','STORED').neq('id',currentAttachmentId).limit(1).maybeSingle();if(error)throw error;return data}

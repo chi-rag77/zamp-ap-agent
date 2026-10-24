@@ -1,0 +1,4 @@
+import {afterEach,describe,it,expect,vi} from 'vitest';
+import {GmailClient} from '../../packages/email/gmail-client';
+afterEach(()=>{vi.unstubAllGlobals();vi.unstubAllEnvs()});
+describe('Gmail client',()=>{it('refreshes OAuth and retries transient Gmail 503',async()=>{vi.stubEnv('GMAIL_CLIENT_ID','client');vi.stubEnv('GMAIL_CLIENT_SECRET','secret');vi.stubEnv('GMAIL_REFRESH_TOKEN','refresh');let messages=0;vi.stubGlobal('fetch',vi.fn(async(input:string)=>{if(input.includes('oauth2.googleapis.com'))return new Response(JSON.stringify({access_token:'test-token',expires_in:3600}),{status:200});messages++;return messages===1?new Response('{}',{status:503}):new Response(JSON.stringify({id:'m1',payload:{}}),{status:200})}));const message=await new GmailClient().getMessage('m1');expect(message.id).toBe('m1');expect(messages).toBe(2)},10000)});
