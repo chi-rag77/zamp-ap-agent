@@ -11,7 +11,9 @@ async function loadPdfParser(){
   // when a PDF is actually being processed (never during normal page rendering).
   const canvas=await import('@napi-rs/canvas');
   Object.assign(globalThis,{DOMMatrix:canvas.DOMMatrix,ImageData:canvas.ImageData,Path2D:canvas.Path2D});
-  return (await import('pdf-parse')).PDFParse;
+  const [{PDFParse},{getData}]=await Promise.all([import('pdf-parse'),import('pdf-parse/worker')]);
+  PDFParse.setWorker(getData());
+  return PDFParse;
 }
 function detectedMime(bytes:Buffer):string|null{
   if(bytes.subarray(0,5).toString()==='%PDF-')return 'application/pdf';
