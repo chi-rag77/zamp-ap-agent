@@ -9,8 +9,16 @@ export default function proxy(request:NextRequest,event:NextFetchEvent){
   if(!workosAuthEnabled()){
     return NextResponse.next();
   }
+  const publicPaths=['/login','/sign-in','/sign-up','/callback','/api/auth/organization','/api/email/cron','/api/email/gmail/callback','/api/email/gmail/webhook','/api/email/watch/renew','/api/agent/worker','/api/webhooks/workos'];
+  const isPublic=publicPaths.some(path=>request.nextUrl.pathname===path||request.nextUrl.pathname.startsWith(`${path}/`));
+  const sessionCookie=request.cookies.get(process.env.WORKOS_COOKIE_NAME||'wos-session');
+  if(!sessionCookie&&!isPublic){
+    const loginUrl=new URL('/login',request.url);
+    loginUrl.searchParams.set('returnTo',`${request.nextUrl.pathname}${request.nextUrl.search}`);
+    return NextResponse.redirect(loginUrl);
+  }
   return authkitProxy({middlewareAuth:{enabled:true,unauthenticatedPaths:[
-    '/sign-in','/sign-up','/callback',
+    '/login','/sign-in','/sign-up','/callback','/api/auth/organization',
     '/api/email/cron','/api/email/gmail/callback','/api/email/gmail/webhook','/api/email/watch/renew',
     '/api/agent/worker','/api/webhooks/workos',
   ]}})(request,event);
