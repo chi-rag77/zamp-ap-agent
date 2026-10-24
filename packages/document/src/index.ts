@@ -45,13 +45,12 @@ export async function prepareDocument(input:InvoiceDocumentInput,env:NodeJS.Proc
   const PDFParse=await loadPdfParser();
   const parser=new PDFParse({data:input.bytes});
   try{
-    let pages:number;
-    try{pages=(await parser.getInfo()).total;if(!Number.isInteger(pages)||pages<1)throw new Error('Invalid PDF page count')}
-    catch(error){console.error('Invoice PDF metadata parsing failed',error);throw new DocumentError('DOCUMENT_CORRUPTED','PDF page count cannot be read')}
-    if(pages>maxPages)throw new DocumentError('DOCUMENT_TOO_LARGE',`PDF has ${pages} pages; limit is ${maxPages}`);
     let rendered;
-    try{rendered=await parser.getScreenshot({first:pages,desiredWidth:1240,imageBuffer:true,imageDataUrl:false})}
-    catch{throw new DocumentError('PDF_RENDER_FAILED','PDF pages could not be rendered')}
+    try{rendered=await parser.getScreenshot({first:1,last:maxPages+1,desiredWidth:1240,imageBuffer:true,imageDataUrl:false})}
+    catch(error){console.error('Invoice PDF page rendering failed',error);throw new DocumentError('DOCUMENT_CORRUPTED','PDF pages could not be read')}
+    const pages=rendered.total;
+    if(!Number.isInteger(pages)||pages<1)throw new DocumentError('DOCUMENT_CORRUPTED','PDF page count cannot be read');
+    if(pages>maxPages)throw new DocumentError('DOCUMENT_TOO_LARGE',`PDF has ${pages} pages; limit is ${maxPages}`);
     if(rendered.pages.length!==pages||rendered.pages.some(page=>page.data.length===0))throw new DocumentError('PDF_RENDER_FAILED','Rendered page count differs from PDF page count');
     return {pages:rendered.pages.map(page=>({pageNumber:page.pageNumber,mimeType:'image/png' as const,bytes:Buffer.from(page.data)})),mimeType,sizeBytes:input.bytes.length};
   }finally{await parser.destroy().catch(()=>undefined)}
