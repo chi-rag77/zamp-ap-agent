@@ -1,8 +1,9 @@
 import {NextRequest,NextResponse} from 'next/server';
+import {localWorkspace} from './data';
 
 export const uuid=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 export function localImportRequest(request:NextRequest,write=false){
-  return process.env.NODE_ENV!=='production'&&['localhost','127.0.0.1'].includes(request.nextUrl.hostname)&&(!write||request.headers.get('origin')===request.nextUrl.origin);
+  return localWorkspace()&&(!write||request.headers.get('origin')===request.nextUrl.origin);
 }
 export function importError(error:unknown){
   const message=error instanceof Error?error.message:'Policy import failed';

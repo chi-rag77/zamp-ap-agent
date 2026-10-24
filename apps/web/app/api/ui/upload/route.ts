@@ -4,11 +4,12 @@ import {createServerClient} from '@zamp/database';
 import {validateDocument,DocumentError} from '@zamp/document';
 import {extractInvoiceDocument,NvidiaVisionProvider,MockVisionProvider} from '@zamp/ai';
 import {validateInvoice} from '@zamp/matching';
+import {localWorkspace} from '../../../../lib/data';
 
 export const runtime='nodejs';
 export const maxDuration=300;
 export async function POST(request:NextRequest){
-  if(process.env.NODE_ENV==='production'||!['localhost','127.0.0.1'].includes(request.nextUrl.hostname)||request.headers.get('origin')!==request.nextUrl.origin)return NextResponse.json({error:'This upload is available only in the local workspace.'},{status:403});
+  if(!localWorkspace()||request.headers.get('origin')!==request.nextUrl.origin)return NextResponse.json({error:'This upload is unavailable outside the connected workspace.'},{status:403});
   let invoiceId:string|undefined;
   try{
     const file=(await request.formData()).get('file');
