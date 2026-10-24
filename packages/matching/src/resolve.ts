@@ -1,10 +1,19 @@
 import type {InvoiceRecord,LineMatchResult,LineRecord,POMatchResult,POLineRecord,PORecord,VendorClaim,VendorMatchResult,VendorRecord} from './types';
 import {normalizeDescription,normalizePurchaseOrderNumber,normalizeSKU,normalizeVendorName,tokenSimilarity} from './normalize';
 import {decimal} from './decimal';
+function claimedIdentifier(value:string|null):string|null{
+  const trimmed=value?.trim();
+  if(!trimmed)return null;
+  // Extraction models sometimes turn an absent value into explanatory prose.
+  // Treat only explicit absence markers as missing; a real but incorrect tax ID
+  // must still fail closed instead of silently falling back to the vendor name.
+  if(/^(?:not\s+(?:provided|available|found|applicable|specified|entered)(?:\b.*)?|unknown|n\s*\/\s*a|na|none|null|missing|[-—])$/i.test(trimmed))return null;
+  return trimmed.replace(/\s/g,'').toUpperCase();
+}
 export function resolveVendor(claim:VendorClaim,existingVendorId:string|null,vendors:VendorRecord[]):VendorMatchResult{
   const active=vendors;
-  const gstin=claim.gstin?.replace(/\s/g,'').toUpperCase();
-  const taxId=claim.taxId?.replace(/\s/g,'').toUpperCase();
+  const gstin=claimedIdentifier(claim.gstin);
+  const taxId=claimedIdentifier(claim.taxId);
   const byId=(id:string)=>active.find(v=>v.id===id);
   const exact=(matches:VendorRecord[],method:VendorMatchResult['method']):VendorMatchResult|null=>{
     if(!matches.length)return null;
