@@ -40,6 +40,9 @@
       "@zamp/policy": [
         "./packages/policy/src/index.ts"
       ],
+      "@zamp/agent": [
+        "./packages/agent/src/index.ts"
+      ],
       "@zamp/policy-import": [
         "./packages/policy-import/src/index.ts"
       ]

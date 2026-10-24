@@ -1,0 +1,19 @@
+import Link from 'next/link';
+import {notFound} from 'next/navigation';
+import {createServerClient} from '@zamp/database';
+import {AgentRunControls} from '../../../../components/agent-run-controls';
+import {Badge,PageHeading,Panel} from '../../../../components/ui';
+import {day,localWorkspace} from '../../../../lib/data';
+export const dynamic='force-dynamic';
+export default async function AgentRunPage({params}:{params:Promise<{runId:string}>}){
+ const {runId}=await params;if(!localWorkspace()||!/^[0-9a-f-]{36}$/i.test(runId))notFound();const db=createServerClient();
+ const [runResult,stepsResult,actionsResult,linkResult]=await Promise.all([db.from('agent_runs').select('*').eq('id',runId).maybeSingle(),db.from('agent_run_steps').select('id,step_number,step_type,name,status,duration_ms,error_code,started_at').eq('run_id',runId).order('step_number'),db.from('agent_actions').select('id,action_type,status,guard_result,error_code,requested_at,verified_at').eq('run_id',runId).order('requested_at'),db.from('agent_run_decisions').select('decision_id').eq('agent_run_id',runId).maybeSingle()]);
+ if(runResult.error||!runResult.data||stepsResult.error||actionsResult.error||linkResult.error)notFound();const run=runResult.data;
+ const decision=linkResult.data?await db.from('agent_decisions').select('decision,reason_code,summary,policy_version,evidence').eq('id',linkResult.data.decision_id).maybeSingle():null;
+ return <><Link className="subtle-back" href="/agent">← Agent activity</Link><PageHeading title="Agent run" subtitle={`Invoice ${run.invoice_id.slice(0,8)} · started ${day(run.started_at)}`} actions={<AgentRunControls runId={runId} status={run.status}/>}/>
+ <div className="metrics-grid"><div className="metric"><div className="metric-label">STATUS</div><div className="metric-value"><Badge label={run.status}/></div><div className="metric-note">{run.current_state.replaceAll('_',' ')}</div></div><div className="metric"><div className="metric-label">DECISION</div><div className="metric-value">{run.final_decision?.replaceAll('_',' ')??'Pending'}</div><div className="metric-note">{run.error_code??run.summary??'Policy evaluation pending'}</div></div><div className="metric"><div className="metric-label">STEPS</div><div className="metric-value">{run.step_count}</div><div className="metric-note">{run.duration_ms==null?'In progress':`${run.duration_ms} ms`}</div></div></div>
+ <Panel title="Execution steps" subtitle="Persisted as each tool runs"><div className="table-scroll"><table className="data-table"><thead><tr><th>#</th><th>STEP</th><th>TYPE</th><th>DURATION</th><th>STATUS</th><th>ERROR</th></tr></thead><tbody>{(stepsResult.data??[]).map(step=><tr key={step.id}><td>{step.step_number}</td><td>{step.name}</td><td>{step.step_type}</td><td>{step.duration_ms==null?'—':`${step.duration_ms} ms`}</td><td><Badge label={step.status}/></td><td>{step.error_code??'—'}</td></tr>)}</tbody></table></div></Panel>
+ <Panel title="Guarded actions"><div className="table-scroll"><table className="data-table"><thead><tr><th>ACTION</th><th>STATUS</th><th>REQUESTED</th><th>VERIFIED</th><th>ERROR</th></tr></thead><tbody>{(actionsResult.data??[]).map(action=><tr key={action.id}><td>{action.action_type.replaceAll('_',' ')}</td><td><Badge label={action.status}/></td><td>{day(action.requested_at)}</td><td>{day(action.verified_at)}</td><td>{action.error_code??'—'}</td></tr>)}</tbody></table></div></Panel>
+ <Panel title="Policy decision" subtitle={decision?.data?.policy_version?`Policy v${decision.data.policy_version}`:'Decision pending'}><div style={{padding:'18px 20px'}}>{decision?.data?<><Badge label={decision.data.decision}/><p style={{marginTop:10}}>{decision.data.summary}</p><small>Reason: {decision.data.reason_code}</small></>:<p className="muted">No saved policy decision for this run yet.</p>}</div></Panel>
+ <Link className="button" href={`/invoices/${run.invoice_id}`}>Open invoice</Link></>;
+}

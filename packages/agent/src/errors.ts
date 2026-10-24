@@ -1,0 +1,2 @@
+export class AgentError extends Error {constructor(public code:string,message=code){super(message);this.name='AgentError'}}
+export function errorCode(error:unknown,fallback='SYSTEM_ERROR'){if(error instanceof AgentError)return error.code;const message=error instanceof Error?error.message:'';const found=/\b(AGENT_TIMEOUT|MAX_ITERATIONS_EXCEEDED|ACTION_NOT_ALLOWED|STALE_DECISION|DUPLICATE_ACTION|ACTION_EXECUTION_FAILED|ACTION_VERIFICATION_FAILED|INVOICE_NOT_PROCESSABLE)\b/.exec(message);return found?.[1]??fallback}

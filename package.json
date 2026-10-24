@@ -11,6 +11,7 @@
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "test": "vitest run",
+    "test:integration": "node --import tsx scripts/test-agent-integration.ts",
     "build": "next build apps/web",
     "db:reset": "SUPABASE_TELEMETRY_DISABLED=1 supabase db reset --local",
     "db:test": "SUPABASE_TELEMETRY_DISABLED=1 supabase test db --local supabase/tests/database",

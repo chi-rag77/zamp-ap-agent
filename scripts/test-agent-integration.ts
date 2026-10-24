@@ -1,0 +1,11 @@
+import assert from 'node:assert/strict';
+import {existsSync} from 'node:fs';
+import {createServerClient} from '@zamp/database';
+import {runAgent} from '@zamp/agent';
+if(existsSync('.env.local'))process.loadEnvFile('.env.local');
+const db=createServerClient();
+const invoiceId='845330cf-4379-49b4-a7a7-f0456c13300d';
+const read=async()=>{const [invoice,runs,reviews,actions]=await Promise.all([db.from('invoices').select('status,decision,updated_at').eq('id',invoiceId).single(),db.from('agent_runs').select('id',{count:'exact',head:true}).eq('invoice_id',invoiceId),db.from('review_cases').select('id',{count:'exact',head:true}).eq('invoice_id',invoiceId),db.from('agent_actions').select('id',{count:'exact',head:true}).eq('invoice_id',invoiceId)]);for(const part of [invoice,runs,reviews,actions])if(part.error)throw part.error;return {invoice:invoice.data,runs:runs.count,reviews:reviews.count,actions:actions.count}};
+const before=await read();const result=await runAgent(invoiceId,{mode:'SIMULATION'});const after=await read();
+assert.notEqual(result.status,'FAILED',result.summary);assert.deepEqual(after,before,'Simulation must not mutate production state');assert.equal(result.verificationStatus,'NOT_APPLICABLE');assert.ok(result.simulatedAction);
+console.log(JSON.stringify({scenario:'read-only-simulation',status:result.status,decision:result.decision,reasonCode:result.reasonCode,stepCount:result.stepCount,productionStateUnchanged:true}));
