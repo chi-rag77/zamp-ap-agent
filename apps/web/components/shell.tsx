@@ -1,5 +1,5 @@
 'use client';
-import {useState} from 'react';
+import {useEffect,useRef,useState} from 'react';
 import Link from 'next/link';
 import {usePathname} from 'next/navigation';
 
@@ -21,6 +21,8 @@ export function Icon({name,size=17}:{name:string;size?:number}){
     search:<><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/></>,
     download:<><path d="M12 3v13m-5-5 5 5 5-5M4 18v3h16v-3"/></>,
     close:<><path d="M5 5 19 19M19 5 5 19"/></>,
+    lock:<><rect x="5" y="10" width="14" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></>,
+    sidebar:<><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16"/></>,
     arrow:<><path d="M5 12h14m-6-6 6 6-6 6"/></>,
   };
   return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{paths[name]??paths.invoice}</svg>;
@@ -46,11 +48,15 @@ const navigation=[
 ];
 export function Shell({children,environment='LOCAL WORKSPACE'}:{children:React.ReactNode;environment?:string}){
   const [open,setOpen]=useState(false);
+  const [collapsed,setCollapsed]=useState(false);
+  const searchRef=useRef<HTMLInputElement>(null);
   const pathname=usePathname();
+  useEffect(()=>{const onShortcut=(event:KeyboardEvent)=>{if((event.metaKey||event.ctrlKey)&&event.key.toLowerCase()==='k'){event.preventDefault();searchRef.current?.focus()}};window.addEventListener('keydown',onShortcut);return()=>window.removeEventListener('keydown',onShortcut)},[]);
   const title=pathname==='/'?'Accounts payable':pathname.startsWith('/invoices/')?'Invoice case':pathname==='/invoices'?'Invoices':pathname==='/purchase-orders'?'Purchase orders':pathname==='/vendors'?'Vendors':pathname==='/agent'?'Agent activity':pathname==='/agent/runs'?'Live runs':pathname.startsWith('/agent/runs/')?'Agent run':pathname==='/exceptions'?'Exceptions':pathname==='/email-intake'?'Email intake':pathname.startsWith('/rules/import')?'Policy import':pathname==='/rules'?'Rules & policies':pathname==='/analytics'?'Analytics':pathname==='/settings'?'Settings':'Audit log';
-  return <div className="app-shell">
-    <header className="topbar"><div className="topbar-left"><button className="icon-button menu-button" type="button" aria-label="Open navigation" onClick={()=>setOpen(true)}><Icon name="menu" size={18}/></button><span className="breadcrumb"><Link href="/">Zamp</Link><span className="slash">/</span><strong>{title}</strong></span></div><div className="topbar-right"><span className="header-environment">{environment}</span><span className="top-icon"><Icon name="bell"/></span><span className="top-icon"><Icon name="help"/></span><div className="profile"><span className="avatar">ZA</span><span><strong>Zamp</strong><small>AP workspace</small></span></div></div></header>
-    {open&&<><button className="nav-backdrop" type="button" aria-label="Close navigation" onClick={()=>setOpen(false)}/><aside className="sidebar" aria-label="Main navigation"><div className="sidebar-brand"><span className="brand-mark">Z</span><strong>Zamp <span>AP</span></strong><button className="icon-button sidebar-close" type="button" aria-label="Close navigation" onClick={()=>setOpen(false)}><Icon name="close"/></button></div><div className="workspace-picker"><span className="workspace-logo">Z</span><span><strong>Zamp workspace</strong><small>Finance operations</small></span><Icon name="chevron" size={14}/></div><nav>{navigation.map((item,i)=>'heading' in item?<p className="nav-heading" key={i}>{item.heading}</p>:<Link className={`nav-item ${pathname===item.href||item.href==='/agent'&&pathname.startsWith('/agent/')||item.href==='/invoices'&&pathname.startsWith('/invoices/')||item.href==='/rules'&&pathname.startsWith('/rules/')?'active':''}`} href={item.href!} key={i} onClick={()=>setOpen(false)}><Icon name={item.icon!}/><span>{item.label}</span></Link>)}</nav><div className="sidebar-footer"><span className="online-dot"/><strong>Matching engine online</strong><small>Phase 03 · deterministic validation</small></div></aside></>}
+  return <div className={`app-shell ${collapsed?'sidebar-collapsed':''}`} data-environment={environment}>
+    <aside className={`sidebar ${open?'sidebar-open':''} ${collapsed?'sidebar-collapsed':''}`} aria-label="Main navigation"><div className="sidebar-brand"><span className="brand-mark">Z</span><strong>Zamp</strong><span className="sidebar-app-badge">AP</span><button className="icon-button sidebar-close" type="button" aria-label={collapsed?'Expand navigation':'Collapse navigation'} onClick={()=>{if(window.matchMedia('(max-width: 850px)').matches)setOpen(false);else setCollapsed(value=>!value)}}><Icon name="sidebar"/></button></div><button className="workspace-picker" type="button"><span className="workspace-logo">AC</span><span><strong>Acme Corporation</strong><small>Finance Operations</small></span><span className="workspace-chevron">⌄</span></button><nav>{navigation.map((item,i)=>'heading' in item?<p className="nav-heading" key={i}>{item.heading==='AI AGENT'?'ZAMP':item.heading}</p>:<Link className={`nav-item ${pathname===item.href||item.href==='/agent'&&pathname.startsWith('/agent/')||item.href==='/invoices'&&pathname.startsWith('/invoices/')||item.href==='/rules'&&pathname.startsWith('/rules/')?'active':''}`} href={item.href!} key={i} onClick={()=>setOpen(false)}><Icon name={item.icon!}/><span>{item.label}</span></Link>)}</nav><div className="sidebar-footer"><div className="sidebar-status"><span className="online-dot"/><strong>ZAMP online</strong></div><small>Processing invoices autonomously</small><div className="sidebar-last-run">Last run <span>12:18</span><button type="button" disabled aria-label="Pause agent">Ⅱ Pause</button></div></div></aside>
+    {open&&<button className="nav-backdrop" type="button" aria-label="Close navigation" onClick={()=>setOpen(false)}/>}
+    <header className="topbar"><div className="topbar-left"><button className="icon-button menu-button" type="button" aria-label="Open navigation" onClick={()=>setOpen(true)}><Icon name="menu" size={18}/></button><span className="breadcrumb"><Link href="/">Zamp</Link><span className="slash">/</span><strong>{title}</strong></span></div><div className="topbar-right"><form className="global-search" action="/invoices"><Icon name="search" size={16}/><input ref={searchRef} type="search" name="q" aria-label="Search invoices, vendors, purchase orders" placeholder="Search invoices, vendors, POs..."/><kbd>⌘K</kbd></form><span className="top-icon"><Icon name="bell"/></span><span className="top-icon"><Icon name="help"/></span><div className="profile"><span className="avatar">PN</span><span><strong>Priya Nair</strong><small>AP Manager</small></span></div></div></header>
     <main className="page-container">{children}</main>
   </div>;
 }
