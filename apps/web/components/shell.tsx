@@ -21,6 +21,7 @@ export function Icon({name,size=17}:{name:string;size?:number}){
     search:<><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/></>,
     download:<><path d="M12 3v13m-5-5 5 5 5-5M4 18v3h16v-3"/></>,
     close:<><path d="M5 5 19 19M19 5 5 19"/></>,
+    lock:<><rect x="5" y="10" width="14" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></>,
     sidebar:<><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16"/></>,
     arrow:<><path d="M5 12h14m-6-6 6 6-6 6"/></>,
   };

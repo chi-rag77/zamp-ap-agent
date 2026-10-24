@@ -34,3 +34,44 @@
 .ap-ring-area{width:118px}.ap-ring{width:111px;height:111px}.ap-ring>span{width:98px;height:98px}.ap-ring strong{font-size:20px}.ap-stat-grid strong{font-size:18px}.ap-stat-grid small{font-size:10px}
 .ap-hero-footer{padding-bottom:22px}
 @media(max-width:850px){.ap-hero-body{padding:22px 18px}.ap-hero h2{font-size:21px}.ap-hero-lead{font-size:13px}.ap-run-meta{top:0}}
+
+/* Base44 dashboard insight and trust panels */
+.ap-insights-grid,.ap-activity-grid{display:grid;grid-template-columns:minmax(0,1.55fr) minmax(330px,1fr);gap:20px;align-items:stretch;margin:0 0 20px}
+.ap-insights-grid>.ap-card,.ap-activity-grid>.ap-card{margin:0;min-width:0}
+.ap-insights-grid .ap-card-head,.ap-activity-grid .ap-card-head{height:78px;padding:15px 20px}
+.ap-insights-grid .ap-card-head h2,.ap-activity-grid .ap-card-head h2{font-size:16px;letter-spacing:-.02em}
+.ap-insights-grid .ap-card-head p,.ap-activity-grid .ap-card-head p{font-size:13px;margin-top:3px}
+.ap-chart-card{min-height:514px;display:flex;flex-direction:column}
+.ap-chart-card .ap-card-head{flex:none}
+.ap-chart-tabs{border-radius:10px;padding:3px}
+.ap-chart-tabs button{font-size:13px;padding:9px 13px;min-height:36px}
+.ap-chart-wrap{height:390px;flex:1;padding:16px 20px 0}
+.ap-chart-foot{font-size:13px;padding:15px 20px;color:#71839d}
+.ap-performance{display:flex;flex-direction:column;min-height:514px}
+.ap-live-badge{display:inline-flex;align-items:center;justify-content:center;min-height:30px;padding:0 13px;border:1px solid #cde8d9;border-radius:18px;background:#edf7f1;color:#287448;font-size:12px;font-weight:700;letter-spacing:.04em;white-space:nowrap}
+.ap-performance-list{display:flex;flex:1;flex-direction:column}
+.ap-performance-row{display:flex;flex:1;flex-direction:column;justify-content:center;min-height:70px;padding:13px 20px;border-color:#e7edf4}
+.ap-performance-row>div:first-child{font-size:14px;color:#344154}
+.ap-performance-row strong{font-size:15px;font-weight:650;color:#263246}
+.ap-performance-track{height:4px;margin-top:13px;background:#eef2f7}
+.ap-performance-track span{background:#2864ef}
+.ap-performance-row:last-child{border-bottom:0}
+.ap-activity-grid>.ap-card{min-height:620px}
+.ap-activity{display:flex;flex-direction:column}
+.ap-activity ol{flex:1;padding:15px 20px 22px}
+.ap-activity li{grid-template-columns:64px 12px minmax(0,1fr);gap:13px;min-height:70px;padding:10px 0}
+.ap-activity li:before{left:76px;top:27px;bottom:-5px}
+.ap-activity time{font-size:13px;line-height:1.45;color:#71839d;padding-top:1px}
+.ap-activity-dot{width:7px;height:7px;margin-top:7px;background:#647894}
+.ap-activity li:nth-child(3n) .ap-activity-dot,.ap-activity li:nth-child(5n) .ap-activity-dot{background:#647894}
+.ap-activity strong{font-size:15px;line-height:1.4;font-weight:500;color:#303b4b}
+.ap-activity small{font-size:13px;line-height:1.4;margin-top:4px;color:#71839d}
+.ap-limits{display:flex;flex-direction:column}
+.ap-limits ul{display:flex;flex:1;flex-direction:column}
+.ap-limits li{display:flex;flex:1;align-items:flex-start;min-height:76px;padding:18px 20px;gap:13px;font-size:15px;line-height:1.45;color:#303b4b;border-color:#e7edf4}
+.ap-limits li>svg{flex:none;margin-top:2px;color:#71839d}
+.ap-limits li small{font-size:13px;line-height:1.4;margin-top:4px;color:#71839d}
+.ap-limits-link{min-height:58px;padding:16px 20px;font-size:14px;border-top:1px solid #e7edf4}
+@media(max-width:1050px){.ap-insights-grid,.ap-activity-grid{grid-template-columns:minmax(0,1.45fr) minmax(300px,1fr);gap:16px}.ap-activity-grid>.ap-card{min-height:0}}
+@media(max-width:850px){.ap-insights-grid,.ap-activity-grid{grid-template-columns:1fr;gap:14px}.ap-insights-grid .ap-card-head,.ap-activity-grid .ap-card-head{height:auto;min-height:72px}.ap-chart-card,.ap-performance{min-height:0}.ap-chart-wrap{height:300px;flex:none}.ap-performance-row{min-height:75px}.ap-activity-grid>.ap-card{min-height:0}.ap-limits li{min-height:72px}}
+@media(max-width:560px){.ap-insights-grid,.ap-activity-grid{gap:12px;margin-bottom:14px}.ap-insights-grid .ap-card-head,.ap-activity-grid .ap-card-head{padding:13px 14px}.ap-insights-grid .ap-card-head h2,.ap-activity-grid .ap-card-head h2{font-size:14px}.ap-insights-grid .ap-card-head p,.ap-activity-grid .ap-card-head p{font-size:11px}.ap-chart-tabs button{min-height:32px;padding:6px 7px;font-size:10px}.ap-chart-wrap{height:230px;padding:10px 8px 0}.ap-chart-foot{padding:11px 14px;font-size:10px}.ap-performance-row{padding:12px 14px;min-height:65px}.ap-performance-row>div:first-child{font-size:12px}.ap-performance-row strong{font-size:13px}.ap-activity ol{padding:12px 12px 16px}.ap-activity li{grid-template-columns:47px 10px minmax(0,1fr);gap:8px;min-height:64px}.ap-activity li:before{left:59px}.ap-activity time{font-size:10px}.ap-activity strong{font-size:12px}.ap-activity small{font-size:10px}.ap-limits li{padding:13px 14px;gap:10px;font-size:12px}.ap-limits li small{font-size:10px}.ap-limits-link{padding:13px 14px;font-size:12px}}
