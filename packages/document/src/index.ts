@@ -1,13 +1,8 @@
-import { mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
-import { promisify } from 'node:util';
-import { execFile } from 'node:child_process';
+import { PDFParse } from 'pdf-parse';
 import sharp from 'sharp';
 export class DocumentError extends Error {constructor(public code:'DOCUMENT_NOT_FOUND'|'DOCUMENT_TOO_LARGE'|'UNSUPPORTED_DOCUMENT_TYPE'|'DOCUMENT_CORRUPTED'|'PDF_RENDER_FAILED',message:string){super(message);this.name='DocumentError'}}
 type VisionPage={pageNumber:number;mimeType:'image/png'|'image/jpeg';bytes:Buffer};
 
-const execute=promisify(execFile);
 export type InvoiceDocumentInput={bytes:Buffer;mimeType:string;filename:string};
 export type PreparedDocument={pages:VisionPage[];mimeType:string;sizeBytes:number};
 const supported=new Set(['application/pdf','image/png','image/jpeg','image/jpg']);
@@ -39,29 +34,17 @@ export async function prepareDocument(input:InvoiceDocumentInput,env:NodeJS.Proc
       return {pages:[{pageNumber:1,mimeType:'image/png',bytes}],mimeType,sizeBytes:input.bytes.length};
     }catch{throw new DocumentError('DOCUMENT_CORRUPTED','Image cannot be decoded')}
   }
-  const directory=await mkdtemp(join(tmpdir(),'zamp-pdf-'));
+  const maxPages=Math.max(1,Number(env.MAX_INVOICE_PAGES??20));
+  const parser=new PDFParse({data:input.bytes});
   try{
-    const file=join(directory,'invoice.pdf');
-    await writeFile(file,input.bytes,{mode:0o600});
-    // Bundled Poppler on macOS may lack a writable Fontconfig cache; isolate it per render.
-    let renderEnv=process.env;
-    if(process.platform==='darwin'&&!process.env.FONTCONFIG_FILE){
-      const fontConfig=join(directory,'fonts.conf');
-      await writeFile(fontConfig,`<?xml version="1.0"?><!DOCTYPE fontconfig SYSTEM "fonts.dtd"><fontconfig><dir>/System/Library/Fonts</dir><dir>/Library/Fonts</dir><cachedir>${directory}</cachedir></fontconfig>`);
-      renderEnv={...process.env,FONTCONFIG_FILE:fontConfig,XDG_CACHE_HOME:directory};
-    }
-    const maxPages=Math.max(1,Number(env.MAX_INVOICE_PAGES??20));
     let pages:number;
-    try{
-      const info=await execute(env.PDFINFO_PATH??'pdfinfo',[file],{timeout:15000,env:renderEnv});
-      pages=Number(/^Pages:\s+(\d+)$/m.exec(info.stdout)?.[1]);
-      if(!Number.isInteger(pages)||pages<1)throw new Error('Invalid PDF page count');
-    }catch{throw new DocumentError('DOCUMENT_CORRUPTED','PDF page count cannot be read')}
+    try{pages=(await parser.getInfo()).total;if(!Number.isInteger(pages)||pages<1)throw new Error('Invalid PDF page count')}
+    catch{throw new DocumentError('DOCUMENT_CORRUPTED','PDF page count cannot be read')}
     if(pages>maxPages)throw new DocumentError('DOCUMENT_TOO_LARGE',`PDF has ${pages} pages; limit is ${maxPages}`);
-    try{await execute(env.PDFTOPPM_PATH??'pdftoppm',['-f','1','-l',String(pages),'-r','150','-png',file,join(directory,'page')],{timeout:Math.max(30000,pages*15000),maxBuffer:16*1024*1024,env:renderEnv})}
+    let rendered;
+    try{rendered=await parser.getScreenshot({first:pages,desiredWidth:1240,imageBuffer:true,imageDataUrl:false})}
     catch{throw new DocumentError('PDF_RENDER_FAILED','PDF pages could not be rendered')}
-    const files=(await readdir(directory)).filter(name=>/^page-\d+\.png$/.test(name)).sort((a,b)=>Number(a.match(/\d+/)?.[0])-Number(b.match(/\d+/)?.[0]));
-    if(files.length!==pages)throw new DocumentError('PDF_RENDER_FAILED','Rendered page count differs from PDF page count');
-    return {pages:await Promise.all(files.map(async(name,index)=>({pageNumber:index+1,mimeType:'image/png' as const,bytes:await readFile(join(directory,name))}))),mimeType,sizeBytes:input.bytes.length};
-  }finally{await rm(directory,{recursive:true,force:true})}
+    if(rendered.pages.length!==pages||rendered.pages.some(page=>page.data.length===0))throw new DocumentError('PDF_RENDER_FAILED','Rendered page count differs from PDF page count');
+    return {pages:rendered.pages.map(page=>({pageNumber:page.pageNumber,mimeType:'image/png' as const,bytes:Buffer.from(page.data)})),mimeType,sizeBytes:input.bytes.length};
+  }finally{await parser.destroy().catch(()=>undefined)}
 }
