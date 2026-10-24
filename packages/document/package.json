@@ -1,1 +1,1 @@
-{"name":"@zamp/document","version":"0.2.0","private":true,"type":"module","exports":"./src/index.ts","dependencies":{"pdf-parse":"2.4.5"}}
+{"name":"@zamp/document","version":"0.2.0","private":true,"type":"module","exports":"./src/index.ts","dependencies":{"@napi-rs/canvas":"0.1.80","pdf-parse":"2.4.5"}}
