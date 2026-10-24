@@ -1,9 +1,10 @@
 import {NextRequest} from 'next/server';
 import {createServerClient} from '@zamp/database';
+import {localWorkspace} from '../../../../../../lib/data';
 
 export const runtime='nodejs';
 export async function GET(request:NextRequest,{params}:{params:Promise<{id:string}>}){
-  if(process.env.NODE_ENV==='production'||!['localhost','127.0.0.1'].includes(request.nextUrl.hostname))return new Response('Local workspace only',{status:403});
+  if(!localWorkspace())return new Response('Workspace unavailable',{status:403});
   const {id}=await params;
   if(!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id))return new Response('Invalid invoice ID',{status:400});
   const db=createServerClient();
