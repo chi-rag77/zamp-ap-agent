@@ -6,7 +6,7 @@ import type {ConnectionState,ProcessingEvent} from '@zamp/realtime';
 export function LiveUpdates({initialCursor='0'}:{initialCursor?:string}){
   const router=useRouter();const cursor=useRef(initialCursor);const [state,setState]=useState<ConnectionState>('CONNECTING');
   useEffect(()=>{
-    let alive=true,failures=0,firstSync=true,timer:ReturnType<typeof setTimeout>|undefined,refreshTimer:ReturnType<typeof setTimeout>|undefined;
+    let alive=true,failures=0,timer:ReturnType<typeof setTimeout>|undefined,refreshTimer:ReturnType<typeof setTimeout>|undefined;
     const refresh=()=>{if(refreshTimer)clearTimeout(refreshTimer);refreshTimer=setTimeout(()=>router.refresh(),160)};
     const poll=async()=>{
       if(!alive)return;
@@ -16,7 +16,6 @@ export function LiveUpdates({initialCursor='0'}:{initialCursor?:string}){
         const data=await response.json() as {events:ProcessingEvent[];cursor:string};
         failures=0;setState('CONNECTED');
         if(data.cursor&&BigInt(data.cursor)>BigInt(cursor.current))cursor.current=data.cursor;
-        if(firstSync){firstSync=false;refresh()}
         if(data.events.length){window.dispatchEvent(new CustomEvent('zamp:processing-events',{detail:data.events}));refresh()}
       }catch{failures++;setState(failures===1?'RECONNECTING':failures>=8?'ERROR':'RECONNECTING')}
       if(alive)timer=setTimeout(poll,2200);

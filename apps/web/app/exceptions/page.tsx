@@ -6,7 +6,7 @@ import {day,invoiceDisplayStatus,latestDecision,latestValidation,loadWorkspace,m
 
 export const dynamic='force-dynamic';
 export default async function ExceptionsPage(){
-  const w=await loadWorkspace();
+  const w=await loadWorkspace('invoices');
   const rows:InvoiceView[]=w.invoices.filter(invoice=>['FAIL','INCOMPLETE','ERROR'].includes(latestValidation(w,invoice.id)?.status??'')||invoice.status==='NEEDS_REVIEW').map(invoice=>{
     const validation=latestValidation(w,invoice.id),policy=latestDecision(w,invoice.id);
     const price=validation?.result?.checks.find(check=>check.check==='PRICE_MATCH'&&check.status==='FAIL');

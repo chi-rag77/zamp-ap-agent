@@ -3,7 +3,7 @@ import {WorkspaceBrief} from '../../components/workspace-brief';
 import {loadWorkspace,money} from '../../lib/data';
 export const dynamic='force-dynamic';
 export default async function VendorsPage(){
-  const w=await loadWorkspace();
+  const w=await loadWorkspace('vendors');
   const invoiceCount=(vendorId:string)=>w.invoices.filter(invoice=>invoice.vendor_id===vendorId).length;
   const spend=(vendorId:string)=>w.invoices.filter(invoice=>invoice.vendor_id===vendorId&&invoice.invoice_date?.startsWith(String(new Date().getFullYear()))).reduce((sum,invoice)=>sum+Number(invoice.total??0),0);
   const matchRate=(vendorId:string)=>{const linked=w.invoices.filter(invoice=>invoice.vendor_id===vendorId);const results=linked.map(invoice=>w.validations.find(row=>row.invoice_id===invoice.id)).filter(Boolean);return results.length?`${Math.round(results.filter(row=>row?.status==='PASS').length/results.length*100)}%`:'—'};

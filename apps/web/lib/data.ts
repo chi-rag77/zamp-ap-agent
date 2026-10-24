@@ -17,20 +17,34 @@ export type ReviewRow={id:string;invoice_id:string;status:string;reason:string;r
 export type Workspace={enabled:boolean;invoices:InvoiceRow[];vendors:VendorRow[];purchaseOrders:PORow[];validations:ValidationRow[];decisions:DecisionRow[];extractions:ExtractionRow[];audits:AuditRow[];runs:RunRow[];agentRuns:AgentRunRow[];reviews:ReviewRow[]};
 const empty:Workspace={enabled:false,invoices:[],vendors:[],purchaseOrders:[],validations:[],decisions:[],extractions:[],audits:[],runs:[],agentRuns:[],reviews:[]};
 function rows<T>(result:{data:T[]|null;error:{message:string}|null},name:string):T[]{if(result.error)throw new Error(`${name}: ${result.error.message}`);return result.data??[]}
-export async function loadWorkspace():Promise<Workspace>{
+export type WorkspaceScope='dashboard'|'invoices'|'vendors'|'purchaseOrders'|'analytics'|'audit'|'agent'|'runs'|'all';
+const skipped={data:[] as never[],error:null};
+export async function loadWorkspace(scope:WorkspaceScope='all',database?:Awaited<ReturnType<typeof createWebServerClient>>):Promise<Workspace>{
   if(!localWorkspace())return empty;
-  const db=await createWebServerClient();
+  const db=database??await createWebServerClient();
+  const include={
+    invoices:['dashboard','invoices','vendors','purchaseOrders','analytics','audit','agent','runs','all'].includes(scope),
+    vendors:['dashboard','invoices','vendors','purchaseOrders','runs','all'].includes(scope),
+    purchaseOrders:['invoices','purchaseOrders','all'].includes(scope),
+    validations:['dashboard','invoices','vendors','analytics','all'].includes(scope),
+    decisions:['dashboard','invoices','all'].includes(scope),
+    extractions:['dashboard','invoices','runs','all'].includes(scope),
+    audits:['dashboard','audit','all'].includes(scope),
+    runs:['dashboard','all'].includes(scope),
+    agentRuns:['dashboard','agent','runs','all'].includes(scope),
+    reviews:['dashboard','invoices','all'].includes(scope),
+  };
   const [invoices,vendors,purchaseOrders,validations,decisions,extractions,audits,runs,agentRuns,reviews]=await Promise.all([
-    db.from('invoices').select('*').is('archived_at',null).order('received_at',{ascending:false}).limit(200),
-    db.from('vendors').select('id,vendor_code,legal_name,display_name,gstin,currency,status').is('archived_at',null).order('legal_name').limit(200),
-    db.from('purchase_orders').select('id,po_number,vendor_id,currency,status,po_date,total,subtotal,tax').is('archived_at',null).order('po_date',{ascending:false}).limit(200),
-    db.from('invoice_validation_runs').select('id,invoice_id,status,engine_version,result,created_at,run_id').order('created_at',{ascending:false}).limit(200),
-    db.from('agent_decisions').select('id,invoice_id,validation_run_id,decision,reason_code,summary,policy_version,created_at').order('created_at',{ascending:false}).limit(200),
-    db.from('invoice_extractions').select('id,invoice_id,status,overall_confidence,normalized_output,provider,model,created_at').eq('is_canonical',true).order('created_at',{ascending:false}).limit(200),
-    db.from('audit_events').select('id,invoice_id,event_type,description,actor_type,created_at').order('created_at',{ascending:false}).limit(100),
-    db.from('processing_runs').select('id,invoice_id,status,agent_version,started_at,completed_at,duration_ms,error_code,created_at').order('created_at',{ascending:false}).limit(100),
-    db.from('agent_runs').select('id,invoice_id,status,run_type,current_state,current_step,agent_version,started_at,completed_at,duration_ms,step_count,retry_count,final_decision,error_code,created_at').order('created_at',{ascending:false}).limit(100),
-    db.from('review_cases').select('id,invoice_id,status,reason,reason_code,priority,created_at').order('created_at',{ascending:false}).limit(100)
+    include.invoices?db.from('invoices').select('id,invoice_number,vendor_id,po_id,invoice_date,due_date,currency,subtotal,tax,total,extraction_confidence,status,decision,source,received_at,current_extraction_id,document_path').is('archived_at',null).order('received_at',{ascending:false}).limit(200):Promise.resolve(skipped),
+    include.vendors?db.from('vendors').select('id,vendor_code,legal_name,display_name,gstin,currency,status').is('archived_at',null).order('legal_name').limit(200):Promise.resolve(skipped),
+    include.purchaseOrders?db.from('purchase_orders').select('id,po_number,vendor_id,currency,status,po_date,total,subtotal,tax').is('archived_at',null).order('po_date',{ascending:false}).limit(200):Promise.resolve(skipped),
+    include.validations?db.from('invoice_validation_runs').select('id,invoice_id,status,engine_version,result,created_at,run_id').order('created_at',{ascending:false}).limit(200):Promise.resolve(skipped),
+    include.decisions?db.from('agent_decisions').select('id,invoice_id,validation_run_id,decision,reason_code,summary,policy_version,created_at').order('created_at',{ascending:false}).limit(200):Promise.resolve(skipped),
+    include.extractions?db.from('invoice_extractions').select('id,invoice_id,status,overall_confidence,normalized_output,provider,model,created_at').eq('is_canonical',true).order('created_at',{ascending:false}).limit(200):Promise.resolve(skipped),
+    include.audits?db.from('audit_events').select('id,invoice_id,event_type,description,actor_type,created_at').order('created_at',{ascending:false}).limit(scope==='dashboard'?30:100):Promise.resolve(skipped),
+    include.runs?db.from('processing_runs').select('id,invoice_id,status,agent_version,started_at,completed_at,duration_ms,error_code,created_at').order('created_at',{ascending:false}).limit(100):Promise.resolve(skipped),
+    include.agentRuns?db.from('agent_runs').select('id,invoice_id,status,run_type,current_state,current_step,agent_version,started_at,completed_at,duration_ms,step_count,retry_count,final_decision,error_code,created_at').order('created_at',{ascending:false}).limit(scope==='dashboard'?30:100):Promise.resolve(skipped),
+    include.reviews?db.from('review_cases').select('id,invoice_id,status,reason,reason_code,priority,created_at').order('created_at',{ascending:false}).limit(100):Promise.resolve(skipped)
   ]);
   return {enabled:true,invoices:rows(invoices,'invoices') as InvoiceRow[],vendors:rows(vendors,'vendors') as VendorRow[],purchaseOrders:rows(purchaseOrders,'purchase orders') as PORow[],validations:rows(validations,'validations') as ValidationRow[],decisions:rows(decisions,'decisions') as DecisionRow[],extractions:rows(extractions,'extractions') as ExtractionRow[],audits:rows(audits,'audit events') as AuditRow[],runs:rows(runs,'processing runs') as RunRow[],agentRuns:rows(agentRuns,'agent runs') as AgentRunRow[],reviews:rows(reviews,'review cases') as ReviewRow[]};
 }
