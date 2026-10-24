@@ -10,3 +10,5 @@ supabase/.branches/
 coverage/
 .DS_Store
 *.log
+
+.next-email-dev/
