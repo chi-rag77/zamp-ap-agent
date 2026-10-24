@@ -1,4 +1,3 @@
-import { PDFParse } from 'pdf-parse';
 import sharp from 'sharp';
 export class DocumentError extends Error {constructor(public code:'DOCUMENT_NOT_FOUND'|'DOCUMENT_TOO_LARGE'|'UNSUPPORTED_DOCUMENT_TYPE'|'DOCUMENT_CORRUPTED'|'PDF_RENDER_FAILED',message:string){super(message);this.name='DocumentError'}}
 type VisionPage={pageNumber:number;mimeType:'image/png'|'image/jpeg';bytes:Buffer};
@@ -6,6 +5,14 @@ type VisionPage={pageNumber:number;mimeType:'image/png'|'image/jpeg';bytes:Buffe
 export type InvoiceDocumentInput={bytes:Buffer;mimeType:string;filename:string};
 export type PreparedDocument={pages:VisionPage[];mimeType:string;sizeBytes:number};
 const supported=new Set(['application/pdf','image/png','image/jpeg','image/jpg']);
+async function loadPdfParser(){
+  // Some serverless Node runtimes do not expose DOMMatrix before pdf.js loads.
+  // Initialize the bundled native canvas globals first, and only import pdf.js
+  // when a PDF is actually being processed (never during normal page rendering).
+  const canvas=await import('@napi-rs/canvas');
+  Object.assign(globalThis,{DOMMatrix:canvas.DOMMatrix,ImageData:canvas.ImageData,Path2D:canvas.Path2D});
+  return (await import('pdf-parse')).PDFParse;
+}
 function detectedMime(bytes:Buffer):string|null{
   if(bytes.subarray(0,5).toString()==='%PDF-')return 'application/pdf';
   if(bytes.subarray(0,8).equals(Buffer.from([137,80,78,71,13,10,26,10])))return 'image/png';
@@ -35,6 +42,7 @@ export async function prepareDocument(input:InvoiceDocumentInput,env:NodeJS.Proc
     }catch{throw new DocumentError('DOCUMENT_CORRUPTED','Image cannot be decoded')}
   }
   const maxPages=Math.max(1,Number(env.MAX_INVOICE_PAGES??20));
+  const PDFParse=await loadPdfParser();
   const parser=new PDFParse({data:input.bytes});
   try{
     let pages:number;

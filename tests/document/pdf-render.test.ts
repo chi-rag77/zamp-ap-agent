@@ -23,10 +23,15 @@ function pdfFixture(pageCount=1){
 
 describe('serverless PDF preparation',()=>{
  it('counts and renders a valid PDF without system Poppler tools',async()=>{
+  const runtime=globalThis as typeof globalThis&{DOMMatrix?:unknown};
+  const original=runtime.DOMMatrix;
+  Reflect.deleteProperty(runtime,'DOMMatrix');
+  try{
   const result=await prepareDocument({bytes:pdfFixture(),mimeType:'application/pdf',filename:'invoice.pdf'});
   expect(result.pages).toHaveLength(1);
   expect(result.pages[0].mimeType).toBe('image/png');
   expect(result.pages[0].bytes.subarray(0,8)).toEqual(Buffer.from([137,80,78,71,13,10,26,10]));
+  }finally{if(original)runtime.DOMMatrix=original}
  });
  it('enforces the configured page limit before rendering',async()=>{
   await expect(prepareDocument({bytes:pdfFixture(2),mimeType:'application/pdf',filename:'invoice.pdf'},{NODE_ENV:'test',MAX_INVOICE_PAGES:'1'})).rejects.toMatchObject({code:'DOCUMENT_TOO_LARGE'} satisfies Partial<DocumentError>);
