@@ -5,7 +5,8 @@ describe('live run filters',()=>{
   it('keeps retried active runs separate from fresh running jobs',()=>{
     expect(matchesRunFilter('running',{status:'RUNNING',retry_count:0})).toBe(true);
     expect(matchesRunFilter('running',{status:'RUNNING',retry_count:1})).toBe(false);
-    expect(matchesRunFilter('retrying',{status:'RUNNING',retry_count:1})).toBe(true);
+    expect(matchesRunFilter('retrying',{status:'RUNNING',retry_count:1,run_type:'RETRY'})).toBe(true);
+    expect(matchesRunFilter('retrying',{status:'RUNNING',retry_count:2,run_type:'FULL_PROCESSING'})).toBe(false);
   });
 
   it('maps review and terminal states to their own filters',()=>{

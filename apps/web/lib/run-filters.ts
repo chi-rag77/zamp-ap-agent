@@ -1,13 +1,13 @@
 export type RunFilter='all'|'running'|'review'|'completed'|'failed'|'retrying';
 export const runFilters:{key:RunFilter;label:string}[]=[{key:'all',label:'All'},{key:'running',label:'Running'},{key:'review',label:'Review required'},{key:'completed',label:'Completed'},{key:'failed',label:'Failed'},{key:'retrying',label:'Retrying'}];
-export function matchesRunFilter(filter:RunFilter,run:{status:string;retry_count:number}){
+export function matchesRunFilter(filter:RunFilter,run:{status:string;retry_count:number;run_type?:string}){
   switch(filter){
     case'all':return true;
     case'running':return ['QUEUED','RUNNING'].includes(run.status)&&run.retry_count===0;
     case'review':return run.status==='WAITING';
     case'completed':return run.status==='COMPLETED';
     case'failed':return run.status==='FAILED';
-    case'retrying':return run.retry_count>0&&['QUEUED','RUNNING'].includes(run.status);
+    case'retrying':return run.run_type==='RETRY'&&['QUEUED','RUNNING'].includes(run.status);
   }
 }
 export function formatRunElapsed(started:string|null,completed:string|null,duration:number|null,now=Date.now()){
