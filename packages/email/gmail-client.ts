@@ -13,6 +13,6 @@ export class GmailClient {
  getMessage(id:string){return this.request<GmailMessage>(`/messages/${encodeURIComponent(id)}?format=full`)}
  listMessages(query='has:attachment',pageToken?:string,maxResults=100){const qs=new URLSearchParams({q:query,maxResults:String(maxResults)});if(pageToken)qs.set('pageToken',pageToken);return this.request<{messages?:{id:string}[];nextPageToken?:string}>(`/messages?${qs}`)}
  getAttachment(messageId:string,attachmentId:string){return this.request<{size:number;data:string}>(`/messages/${encodeURIComponent(messageId)}/attachments/${encodeURIComponent(attachmentId)}`)}
- listHistory(startHistoryId:string,pageToken?:string){const qs=new URLSearchParams({startHistoryId,historyTypes:'messageAdded'});if(pageToken)qs.set('pageToken',pageToken);return this.request<GmailHistory>(`/history?${qs}`)}
+ listHistory(startHistoryId:string,pageToken?:string){const qs=new URLSearchParams({startHistoryId});qs.append('historyTypes','messageAdded');qs.append('historyTypes','labelAdded');if(pageToken)qs.set('pageToken',pageToken);return this.request<GmailHistory>(`/history?${qs}`)}
  watchMailbox(topicName:string){return this.request<{historyId:string;expiration:string}>('/watch',{method:'POST',body:JSON.stringify({topicName,labelIds:['INBOX'],labelFilterBehavior:'INCLUDE'})})}
 }

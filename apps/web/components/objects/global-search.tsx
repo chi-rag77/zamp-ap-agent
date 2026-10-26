@@ -1,0 +1,10 @@
+'use client';
+import Link from 'next/link';
+import {useEffect,useRef,useState} from 'react';
+import {workspaceRequest} from './client';
+import './workspace.css';
+export function GlobalSearch(){const [query,setQuery]=useState(''),[results,setResults]=useState<{type:string;id:string;label:string;status:string;href?:string}[]>([]),[open,setOpen]=useState(false),[busy,setBusy]=useState(false),[error,setError]=useState('');const ref=useRef<HTMLInputElement>(null);
+ useEffect(()=>{const key=(e:KeyboardEvent)=>{if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==='k'){e.preventDefault();ref.current?.focus();setOpen(true)}if(e.key==='Escape')setOpen(false)};window.addEventListener('keydown',key);return()=>window.removeEventListener('keydown',key)},[]);
+ useEffect(()=>{let active=true;if(query.trim().length<2){setResults([]);return}setBusy(true);const timer=setTimeout(()=>workspaceRequest<{results:typeof results}>(`search?q=${encodeURIComponent(query)}`).then(r=>{if(active){setResults(r.results);setError('')}}).catch(e=>{if(active)setError(e.message)}).finally(()=>{if(active)setBusy(false)}),300);return()=>{active=false;clearTimeout(timer)}},[query]);
+ return <div className="global-search" style={{position:'relative'}} onBlur={e=>{if(!e.currentTarget.contains(e.relatedTarget as Node))setOpen(false)}}><span aria-hidden="true">⌕</span><input ref={ref} aria-label="Search workspace" placeholder="Search invoices, vendors, POs…" value={query} onFocus={()=>setOpen(true)} onChange={e=>{setQuery(e.target.value);setOpen(true)}}/><kbd>⌘K</kbd>{open&&query.length>=2&&<div className="ow-search-results" aria-label="Search results">{busy?<p role="status" style={{padding:12}}>Searching…</p>:error?<p role="alert">{error}</p>:results.length?results.map(r=><Link key={`${r.type}/${r.id}`} href={r.href??`/objects/${r.type}/${r.id}`} onClick={()=>setOpen(false)}>{r.label}<small style={{display:'block',color:'#7185a3'}}>{r.type.replaceAll('_',' ')} · {r.status}</small></Link>):<p style={{padding:12}}>No matching records.</p>}</div>}</div>
+}

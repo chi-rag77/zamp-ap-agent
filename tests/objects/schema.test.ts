@@ -1,0 +1,20 @@
+import {describe,it,expect} from 'vitest';
+import {configurationSchema,emptyConfiguration,validateValues,compatibleSchema,canConfigure,type FieldDefinition} from '../../packages/objects/src/schema';
+const field:FieldDefinition={key:'cost_center',label:'Cost center',type:'select',scope:'record',section:'custom_details',options:['Engineering','Finance'],required:true,hidden:false,searchable:true,filterable:true,integrationKey:'costCenter',help:''};
+const schema={...emptyConfiguration('invoice'),fields:[field]};
+describe('organization field definitions',()=>{
+ it('accepts a record and line section',()=>expect(configurationSchema.parse(schema)).toEqual(schema));
+ it.each(['__proto__','constructor','UPPER KEY','a'])('rejects unsafe key %s',key=>expect(configurationSchema.safeParse({...schema,fields:[{...field,key}]}).success).toBe(false));
+ it('rejects required hidden fields',()=>expect(configurationSchema.safeParse({...schema,fields:[{...field,hidden:true}]}).success).toBe(false));
+ it('rejects nonexistent section references',()=>expect(configurationSchema.safeParse({...schema,fields:[{...field,section:'missing'}]}).success).toBe(false));
+ it('rejects line sections on vendors',()=>expect(configurationSchema.safeParse({...schema,object:'vendor'}).success).toBe(false));
+ it('rejects duplicate keys',()=>expect(configurationSchema.safeParse({...schema,fields:[field,field]}).success).toBe(false));
+ it('validates required and option constraints',()=>{expect(validateValues(schema,{}, {},[])).toEqual(['Cost center: Required']);expect(validateValues(schema,{cost_center:'Other'},{},[])).toEqual(['Cost center: Choose an available option']);expect(validateValues(schema,{cost_center:'Finance'},{},[])).toEqual([])});
+ it('rejects values outside published definitions',()=>expect(validateValues(schema,{cost_center:'Finance',status:'APPROVED'},{},[])).toContain('status: unknown field'));
+ it('rejects foreign line identifiers',()=>expect(validateValues(schema,{cost_center:'Finance'},{foreign:{}},[])).toContain('Unknown line foreign'));
+ it('enforces required fields on every line',()=>{const s={...schema,fields:[{...field,scope:'line' as const,section:'line_details'}]};expect(validateValues(s,{}, {a:{cost_center:'Finance'}},['a','b'])).toEqual(['Line b: Cost center: Required'])});
+ it('preserves existing field types',()=>expect(compatibleSchema(schema,{...schema,fields:[{...field,type:'number'}]})).toHaveLength(1));
+ it('restricts publishing to organization admins',()=>{expect(canConfigure('ADMIN')).toBe(true);expect(canConfigure('MEMBER')).toBe(false);expect(canConfigure('admin')).toBe(false)});
+ it('rejects impossible dates',()=>{const s={...schema,fields:[{...field,type:'date' as const}]};expect(validateValues(s,{cost_center:'2026-02-31'},{},[])).toHaveLength(1)});
+ it('rejects unsafe URL protocols',()=>{const s={...schema,fields:[{...field,type:'url' as const}]};expect(validateValues(s,{cost_center:'javascript:alert(1)'},{},[])).toHaveLength(1)});
+});
