@@ -5,4 +5,4 @@ export interface EmailMessage {provider:'GMAIL'|'DEMO';messageId:string;threadId
 export type Classification='INVOICE'|'POSSIBLE_INVOICE'|'NON_INVOICE'|'UNSUPPORTED';
 export interface ClassificationResult {classification:Classification;confidence:number;reasons:string[];attachmentCount:number}
 export interface EmailIntakeResult {emailIntakeId:string;status:'PROCESSED'|'IGNORED'|'NEEDS_REVIEW'|'FAILED';messageId:string;attachmentsProcessed:number;invoicesCreated:number;duplicateAttachments:number;unsupportedAttachments:number;agentRunsTriggered:number;errors:string[]}
-export interface GmailHistory {historyId?:string;nextPageToken?:string;history?:{id:string;messagesAdded?:{message:{id:string}}[]}[]}
+export interface GmailHistory {historyId?:string;nextPageToken?:string;history?:{id:string;messagesAdded?:{message:{id:string}}[];labelsAdded?:{message:{id:string};labelIds:string[]}[]}[]}
