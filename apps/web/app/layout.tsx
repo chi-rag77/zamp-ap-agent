@@ -2,14 +2,14 @@ import './globals.css';
 import './base44-listings.css';
 import './realtime.css';
 import './login.css';
-import {Inter} from 'next/font/google';
+import localFont from 'next/font/local';
 import {Shell} from '../components/shell';
 import {vercelWorkspaceEnabled} from '../lib/data';
 import {withAuth} from '@workos-inc/authkit-nextjs';
 import {AuthKitProvider} from '@workos-inc/authkit-nextjs/components';
 import {workosAuthEnabled} from '../lib/workos-auth';
 
-const inter=Inter({subsets:['latin'],variable:'--font-inter',display:'swap'});
+const inter=localFont({src:'../public/fonts/inter-latin.woff2',variable:'--font-inter',display:'swap',weight:'100 900'});
 
 export const metadata={title:'Zamp AP Agent — Accounts payable',description:'Invoice extraction, matching and validation workspace'};
 export default async function RootLayout({children}:Readonly<{children:React.ReactNode}>){
