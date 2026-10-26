@@ -35,7 +35,10 @@ export async function syncGmailMailbox(client=new GmailClient(),processMessage=p
     let page:string|undefined;
     do{
      const result=await client.listHistory(cursor!,page);
-     for(const history of result.history??[])for(const added of history.messagesAdded??[])ids.add(added.message.id);
+     for(const history of result.history??[]){
+      for(const added of history.messagesAdded??[])ids.add(added.message.id);
+      for(const added of history.labelsAdded??[])if(added.labelIds.includes('INBOX'))ids.add(added.message.id);
+     }
      latest=result.historyId??latest;
      page=result.nextPageToken;
     }while(page);
@@ -46,6 +49,20 @@ export async function syncGmailMailbox(client=new GmailClient(),processMessage=p
      const marked=await db.from('email_sync_state').update({status:'REQUIRES_FULL_SYNC',full_sync_page_token:null}).eq('mailbox',mailbox);
      if(marked.error)throw marked.error;
     }else throw error;
+   }
+  }
+
+  // A bounded recent-inbox check repairs missed history notifications and finds
+  // older messages that only just became visible in the inbox. Existing records
+  // are skipped before downloading the message or running extraction again.
+  if(!fullSync){
+   const recent=await client.listMessages('in:inbox has:attachment newer_than:2d',undefined,100);
+   const candidates=(recent.messages??[]).map(item=>item.id).filter(Boolean);
+   if(candidates.length){
+    const {data:known,error:knownError}=await db.from('email_intakes').select('message_id').eq('provider','GMAIL').in('message_id',candidates);
+    if(knownError)throw knownError;
+    const seen=new Set((known??[]).map(row=>row.message_id));
+    for(const id of candidates)if(!seen.has(id))ids.add(id);
    }
   }
 

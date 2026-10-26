@@ -5,11 +5,12 @@ import {EmailError} from '../../packages/email/errors';
 const state=vi.hoisted(()=>({
  row:{last_history_id:'100',status:'HEALTHY',full_sync_page_token:null} as Record<string,unknown>,
  writes:[] as Record<string,unknown>[],
- reset(){this.row={last_history_id:'100',status:'HEALTHY',full_sync_page_token:null};this.writes=[];},
+ known:[] as string[],
+ reset(){this.known=[];this.row={last_history_id:'100',status:'HEALTHY',full_sync_page_token:null};this.writes=[];},
 }));
 
 vi.mock('@zamp/database',()=>({createServerClient:()=>({from:()=>({
- select:()=>({eq:()=>({maybeSingle:async()=>({data:{...state.row},error:null})})}),
+ select:()=>({eq:()=>({maybeSingle:async()=>({data:{...state.row},error:null}),in:async()=>({data:state.known.map(message_id=>({message_id})),error:null})})}),
  upsert:async(row:Record<string,unknown>)=>{state.writes.push(row);state.row={...state.row,...row};return {error:null};},
  update:(row:Record<string,unknown>)=>({eq:async()=>{state.row={...state.row,...row};return {error:null};}}),
 })})}));
@@ -32,9 +33,19 @@ describe('Gmail history synchronization',()=>{
 
  it('keeps the old cursor when incremental processing fails',async()=>{
   vi.stubEnv('GMAIL_INVOICE_MAILBOX','ap@example.com');
-  const client={getProfile:async()=>({emailAddress:'ap@example.com',historyId:'200'}),listHistory:async()=>({historyId:'200',history:[{id:'150',messagesAdded:[{message:{id:'m1'}}]}]})} as unknown as GmailClient;
+  const client={getProfile:async()=>({emailAddress:'ap@example.com',historyId:'200'}),listHistory:async()=>({historyId:'200',history:[{id:'150',messagesAdded:[{message:{id:'m1'}}]}]}),listMessages:async()=>({messages:[]})} as unknown as GmailClient;
   await expect(syncGmailMailbox(client,async()=>({status:'FAILED'} as never))).rejects.toThrow('failed processing');
   expect(state.row).toMatchObject({last_history_id:'100',status:'FAILED'});
+ });
+
+ it('catches an invoice moved into the inbox without reprocessing known messages',async()=>{
+  vi.stubEnv('GMAIL_INVOICE_MAILBOX','ap@example.com');
+  state.known=['seen'];
+  const processed:string[]=[];
+  const client={getProfile:async()=>({emailAddress:'ap@example.com',historyId:'200'}),listHistory:async()=>({historyId:'200',history:[{id:'190',labelsAdded:[{message:{id:'moved'},labelIds:['INBOX']},{message:{id:'other'},labelIds:['STARRED']}]}]}),listMessages:async()=>({messages:[{id:'seen'},{id:'fresh'}]})} as unknown as GmailClient;
+  const result=await syncGmailMailbox(client,async id=>{processed.push(id);return {status:'PROCESSED'} as never;});
+  expect(result).toMatchObject({fullSync:false,processed:2,historyId:'200'});
+  expect(processed).toEqual(['moved','fresh']);
  });
 
  it('resumes full sync from its saved page token and advances the history cursor only on the last page',async()=>{
