@@ -63,7 +63,12 @@ export function poNumber(workspace:Workspace,invoice:InvoiceRow){
   const extracted=extractionFor(workspace,invoice.id)?.normalized_output?.poNumber;
   return matched??linked??(typeof extracted==='string'?extracted:null);
 }
-export const money=(value:string|number|null|undefined,currency='INR')=>value===null||value===undefined?'—':new Intl.NumberFormat('en-IN',{style:'currency',currency,maximumFractionDigits:2}).format(Number(value));
+export const money=(value:string|number|null|undefined,currency:string|null|undefined='INR')=>{
+  if(value===null||value===undefined)return '—';
+  const code=currency?.trim().toUpperCase()||'INR';
+  try{return new Intl.NumberFormat('en-IN',{style:'currency',currency:code,maximumFractionDigits:2}).format(Number(value))}
+  catch{return `${new Intl.NumberFormat('en-IN',{maximumFractionDigits:2}).format(Number(value))} ${code}`}
+};
 export const day=(value:string|null|undefined)=>value?new Intl.DateTimeFormat('en-GB',{day:'2-digit',month:'short',year:'numeric'}).format(new Date(value)):'—';
 export const shortDate=(value:string|null|undefined)=>value?new Intl.DateTimeFormat('en-GB',{day:'2-digit',month:'short'}).format(new Date(value)):'—';
 export const percent=(value:string|number|null|undefined)=>value===null||value===undefined?'—':`${(Number(value)*100).toFixed(1)}%`;
