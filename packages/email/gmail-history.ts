@@ -36,7 +36,12 @@ export async function syncGmailMailbox(client=new GmailClient(),processMessage=p
     do{
      const result=await client.listHistory(cursor!,page);
      for(const history of result.history??[]){
-      for(const added of history.messagesAdded??[])ids.add(added.message.id);
+      // Gmail history includes sent messages as well as inbox mail. Inspect only
+      // metadata labels here so outbound notifications are never ingested as invoices.
+      for(const added of history.messagesAdded??[]){
+       const metadata=await client.getMessageMetadata(added.message.id);
+       if(metadata.labelIds?.includes('INBOX'))ids.add(added.message.id);
+      }
       for(const added of history.labelsAdded??[])if(added.labelIds.includes('INBOX'))ids.add(added.message.id);
      }
      latest=result.historyId??latest;
@@ -73,6 +78,15 @@ export async function syncGmailMailbox(client=new GmailClient(),processMessage=p
    for(const item of result.messages??[])ids.add(item.id);
    nextFullSyncPageToken=result.nextPageToken;
    latest=profile.historyId;
+  }
+
+  // History cursors and full-sync pagination can return already handled messages.
+  // Skip every durable intake, including failed ones that need an explicit reprocess.
+  if(ids.size){
+   const {data:known,error:knownError}=await db.from('email_intakes').select('message_id').eq('provider','GMAIL').in('message_id',[...ids]);
+   if(knownError)throw knownError;
+   const seen=new Set((known??[]).map(row=>row.message_id));
+   for(const id of seen)ids.delete(id);
   }
 
   let processed=0,failed=0;

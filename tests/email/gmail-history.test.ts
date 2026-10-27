@@ -33,7 +33,7 @@ describe('Gmail history synchronization',()=>{
 
  it('advances past a durably failed email so one bad document cannot block the mailbox',async()=>{
   vi.stubEnv('GMAIL_INVOICE_MAILBOX','ap@example.com');
-  const client={getProfile:async()=>({emailAddress:'ap@example.com',historyId:'200'}),listHistory:async()=>({historyId:'200',history:[{id:'150',messagesAdded:[{message:{id:'bad'}},{message:{id:'good'}}]}]}),listMessages:async()=>({messages:[]})} as unknown as GmailClient;
+  const client={getProfile:async()=>({emailAddress:'ap@example.com',historyId:'200'}),getMessageMetadata:async()=>({labelIds:['INBOX']}),listHistory:async()=>({historyId:'200',history:[{id:'150',messagesAdded:[{message:{id:'bad'}},{message:{id:'good'}}]}]}),listMessages:async()=>({messages:[]})} as unknown as GmailClient;
   const processed:string[]=[];
   const result=await syncGmailMailbox(client,async id=>{processed.push(id);return {status:id==='bad'?'FAILED':'PROCESSED'} as never;});
   expect(result).toMatchObject({processed:1,failed:1,historyId:'200',hasMore:false});
@@ -41,9 +41,24 @@ describe('Gmail history synchronization',()=>{
   expect(state.row).toMatchObject({last_history_id:'200',status:'HEALTHY',last_error:'1 email(s) failed processing and remain available in the review queue.'});
  });
 
+ it('ignores sent mail and does not retry a message with an existing intake',async()=>{
+  vi.stubEnv('GMAIL_INVOICE_MAILBOX','ap@example.com');
+  state.known=['already-failed'];
+  const client={
+   getProfile:async()=>({emailAddress:'ap@example.com',historyId:'200'}),
+   getMessageMetadata:async(id:string)=>({labelIds:id==='sent-message'?['SENT']:['INBOX']}),
+   listHistory:async()=>({historyId:'200',history:[{id:'150',messagesAdded:[{message:{id:'sent-message'}},{message:{id:'already-failed'}},{message:{id:'new-inbox'}}]}]}),
+   listMessages:async()=>({messages:[]}),
+  } as unknown as GmailClient;
+  const processed:string[]=[];
+  const result=await syncGmailMailbox(client,async id=>{processed.push(id);return {status:'PROCESSED'} as never;});
+  expect(result.processed).toBe(1);
+  expect(processed).toEqual(['new-inbox']);
+ });
+
  it('preserves the cursor when the message cannot be durably recorded',async()=>{
   vi.stubEnv('GMAIL_INVOICE_MAILBOX','ap@example.com');
-  const client={getProfile:async()=>({emailAddress:'ap@example.com',historyId:'200'}),listHistory:async()=>({historyId:'200',history:[{id:'150',messagesAdded:[{message:{id:'m1'}}]}]}),listMessages:async()=>({messages:[]})} as unknown as GmailClient;
+  const client={getProfile:async()=>({emailAddress:'ap@example.com',historyId:'200'}),getMessageMetadata:async()=>({labelIds:['INBOX']}),listHistory:async()=>({historyId:'200',history:[{id:'150',messagesAdded:[{message:{id:'m1'}}]}]}),listMessages:async()=>({messages:[]})} as unknown as GmailClient;
   await expect(syncGmailMailbox(client,async()=>{throw new Error('database unavailable')})).rejects.toThrow('database unavailable');
   expect(state.row).toMatchObject({last_history_id:'100',status:'FAILED'});
  });
