@@ -63,12 +63,12 @@ export async function GET(request: NextRequest) {
   if (!tokenResponse.ok) return NextResponse.json({ error: 'Google rejected the OAuth exchange. Check the client and redirect URI.' }, { status: 502 });
   const tokenData = await tokenResponse.json() as { refresh_token?: string; scope?: string };
   const grantedScopes = new Set((tokenData.scope ?? '').split(/\s+/));
-  if (!grantedScopes.has('https://www.googleapis.com/auth/gmail.readonly')) {
-    return NextResponse.json({ error: 'Google did not return the required Gmail read-only access. Reconnect and approve that scope.' }, { status: 400 });
+  if (!grantedScopes.has('https://www.googleapis.com/auth/gmail.readonly') || !grantedScopes.has('https://www.googleapis.com/auth/gmail.send')) {
+    return NextResponse.json({ error: 'Google did not return both Gmail read and send permissions. Reconnect and approve both scopes.' }, { status: 400 });
   }
 
   try {
-    if (!tokenData.refresh_token) return NextResponse.json({ error: 'Google did not issue a refresh token. Reconnect and approve the Gmail read-only scope.' }, { status: 400 });
+    if (!tokenData.refresh_token) return NextResponse.json({ error: 'Google did not issue a refresh token. Reconnect and approve the Gmail permissions.' }, { status: 400 });
     await storeGmailRefreshToken(mailbox, tokenData.refresh_token, [...grantedScopes]);
   } catch {
     return NextResponse.json({ error: 'Gmail connected, but its secure server-side credential record could not be saved.' }, { status: 500 });
