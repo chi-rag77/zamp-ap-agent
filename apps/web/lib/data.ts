@@ -4,7 +4,7 @@ import type {InvoiceValidationResult} from '@zamp/matching';
 
 export const vercelWorkspaceEnabled=()=>process.env.VERCEL==='1'&&['preview','production'].includes(process.env.VERCEL_ENV??'')&&process.env.ZAMP_ENABLE_PROTECTED_WORKSPACE==='true';
 export const localWorkspace=()=>process.env.NODE_ENV!=='production'||vercelWorkspaceEnabled();
-export type InvoiceRow={id:string;invoice_number:string|null;vendor_id:string|null;po_id:string|null;invoice_date:string|null;due_date:string|null;currency:string;subtotal:string|null;tax:string|null;total:string|null;extraction_confidence:string|null;status:string;decision:string|null;source:string;received_at:string;current_extraction_id:string|null;document_path:string|null};
+export type InvoiceRow={id:string;invoice_number:string|null;vendor_id:string|null;po_id:string|null;invoice_date:string|null;due_date:string|null;currency:string;subtotal:string|null;tax:string|null;total:string|null;extraction_confidence:string|null;status:string;decision:string|null;source:string;received_at:string;current_extraction_id:string|null;document_path:string|null;updated_at:string;bill_to?:Record<string,unknown>|null;ship_to?:Record<string,unknown>|null};
 export type VendorRow={id:string;vendor_code:string;legal_name:string;display_name:string;gstin:string|null;currency:string;status:string};
 export type PORow={id:string;po_number:string;vendor_id:string;currency:string;status:string;po_date:string;total:string;subtotal:string;tax:string};
 export type ValidationRow={id:string;invoice_id:string;status:string;engine_version:string;result:InvoiceValidationResult;created_at:string;run_id:string};
@@ -68,6 +68,8 @@ export const day=(value:string|null|undefined)=>value?new Intl.DateTimeFormat('e
 export const shortDate=(value:string|null|undefined)=>value?new Intl.DateTimeFormat('en-GB',{day:'2-digit',month:'short'}).format(new Date(value)):'—';
 export const percent=(value:string|number|null|undefined)=>value===null||value===undefined?'—':`${(Number(value)*100).toFixed(1)}%`;
 export function invoiceDisplayStatus(workspace:Workspace,invoice:InvoiceRow){
+  if(invoice.status==='PENDING_APPROVAL')return 'PENDING APPROVAL';
+  if(invoice.status==='RETURNED_FOR_CORRECTION')return 'RETURNED FOR CORRECTION';
   if(invoice.decision==='AUTO_APPROVED'||invoice.decision==='HUMAN_APPROVED'||invoice.status==='APPROVED')return 'APPROVED';
   if(invoice.decision==='AUTO_REJECTED'||invoice.decision==='HUMAN_REJECTED'||invoice.status==='REJECTED')return 'REJECTED';
   if(invoice.status==='NEEDS_REVIEW'||workspace.reviews.some(r=>r.invoice_id===invoice.id&&r.status==='OPEN'))return 'NEEDS REVIEW';

@@ -163,3 +163,34 @@
 .ic-collapsible .ic-evidence>div{min-height:50px}
 @media(max-width:950px){.ic-po-main,.ic-decision-main{grid-template-columns:minmax(0,1fr) 175px}.ic-po-detail-grid,.ic-decision-grid{grid-template-columns:1fr}.ic-po-kicker,.ic-decision-kicker{flex-wrap:wrap;white-space:normal}}
 @media(max-width:700px){.ic-po-main,.ic-decision-main{grid-template-columns:1fr}.ic-po-rail,.ic-decision-rail{border-left:0;border-top:1px solid #e0e7f0;flex-direction:row;padding:11px 15px}.ic-overview-stats{margin-top:10px}.ic-flow{grid-template-columns:1fr}.ic-flow-arrow{display:none}.ic-flow>div:not(.ic-flow-arrow){border-bottom:1px solid #e8ecef!important}.ic-tolerance-limits{display:none}.ic-policy-grid{grid-template-columns:1fr}.ic-policy-grid>div{border-right:0}.ic-collapsible>summary{gap:6px;padding:8px 10px}.ic-collapsible>summary strong{font-size:10px}}
+
+/* Outcome banners use the same quiet ZAMP status palette across invoice tabs. */
+.ic-po-hero,.ic-decision-summary{border-color:#dfe7f1;background:linear-gradient(112deg,#fff 0%,#fff 57%,#f7f9fc 100%)}
+.ic-po-hero:before,.ic-decision-summary:before{height:3px;background:#c7d2e1}
+.ic-po-hero.is-approved,.ic-decision-summary.is-approved{border-color:#cfe9d8;background:linear-gradient(112deg,#f0faf3 0%,#f7fcf8 54%,#fff 100%)}
+.ic-po-hero.is-approved:before,.ic-decision-summary.is-approved:before{background:linear-gradient(90deg,#34a66a,#b9e6c8)}
+.ic-po-hero.is-review,.ic-decision-summary.is-review{border-color:#f0dfb8;background:linear-gradient(112deg,#fff9e9 0%,#fffdf6 54%,#fff 100%)}
+.ic-po-hero.is-review:before,.ic-decision-summary.is-review:before{background:linear-gradient(90deg,#d99b22,#f5dfab)}
+.ic-decision-summary.is-rejected{border-color:#f0d2cf;background:linear-gradient(112deg,#fff1ef 0%,#fff9f8 54%,#fff 100%)}
+.ic-decision-summary.is-rejected:before{background:linear-gradient(90deg,#d9584f,#f3c2bd)}
+.ic-po-hero.is-approved .ic-po-rail .ic-confidence-bar i{background:#36a66a}
+.ic-po-hero.is-review .ic-po-rail .ic-confidence-bar i{background:#d99b22}
+.ic-decision-summary.is-approved .ic-decision-rail{border-left-color:#d7eadc}
+.ic-decision-summary.is-review .ic-decision-rail{border-left-color:#efe3c9}
+.ic-decision-summary.is-rejected .ic-decision-rail{border-left-color:#f0d9d6}
+.ic-po-rail .ic-rail-next{font-size:11px!important;line-height:1.45!important;letter-spacing:0!important;margin-top:5px!important}
+.ic-po-detail-grid .ic-card-head>.ic-pill{margin-left:auto;align-self:center}
+.ic-decision-grid .ic-card-head h2{font-size:13px}
+@media(max-width:700px){.ic-po-main,.ic-decision-main{grid-template-columns:1fr}.ic-po-rail,.ic-decision-rail{border-left:0;border-top:1px solid #e0e7f0;flex-direction:row;padding:12px 15px}.ic-po-kicker,.ic-decision-kicker{white-space:normal;flex-wrap:wrap}}
+.ic-po-kicker,.ic-decision-kicker{white-space:normal;flex-wrap:wrap;align-content:center}
+.ic-po-kicker>span:nth-child(2),.ic-decision-kicker>span:nth-child(2){min-width:0;white-space:normal;line-height:1.35}
+.ic-po-kicker .ic-pill,.ic-decision-kicker .ic-pill{flex:none}
+.ic-tolerance-limits{display:block;max-width:100%;white-space:normal;line-height:1.35;text-align:right}
+@media(max-width:860px){.ic-po-detail-grid,.ic-decision-grid{grid-template-columns:1fr}.ic-tolerance-limits{text-align:left}}
+.ic-tolerance-limits{margin-top:3px;font-size:9px;color:#7a8ba3;white-space:normal;line-height:1.35;text-align:left}
+.ic-po-detail-grid,.ic-decision-grid{align-items:start}
+/* Clear recovery path for decisions saved before detailed policy evidence existed. */
+.ic-policy-refresh-note{display:flex;align-items:center;justify-content:space-between;gap:14px;max-width:860px;padding:14px 16px;margin:10px 12px;background:#f3f7ff;border:1px solid #dce7fb;border-radius:8px;color:#455c7d;font-size:12px;line-height:1.5}
+.ic-policy-refresh-note .ic-policy-run{flex:none}
+.ic-policy-refresh-note .ic-policy-error{display:block;flex-basis:100%;color:#a33f43;background:#fff4f3;border:1px solid #f3d7d5;border-radius:7px;padding:8px 10px;font-size:11px}
+@media(max-width:700px){.ic-policy-refresh-note{align-items:flex-start;flex-direction:column}}

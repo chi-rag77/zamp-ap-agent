@@ -1,0 +1,11 @@
+begin;
+create extension if not exists pgtap with schema extensions;
+set local search_path = public, extensions;
+select plan(5);
+select has_table('public','approval_email_tokens','Email decision tokens have a dedicated table');
+select ok((select relrowsecurity from pg_class where oid='public.approval_email_tokens'::regclass),'Email token table has row level security enabled');
+select ok(not has_table_privilege('anon','public.approval_email_tokens','SELECT'),'Anonymous callers cannot inspect email tokens');
+select ok(not has_function_privilege('anon','public.decide_invoice_approval_from_email(text,text,text)','EXECUTE'),'Anonymous callers cannot execute the decision function');
+select ok(has_function_privilege('service_role','public.decide_invoice_approval_from_email(text,text,text)','EXECUTE'),'Only the server role can execute the email decision function');
+select * from finish();
+rollback;

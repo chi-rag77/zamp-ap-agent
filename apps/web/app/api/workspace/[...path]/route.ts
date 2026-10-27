@@ -5,6 +5,7 @@ import {objectTypeSchema,objectTypes,coreFields,tables,lineTables,configurationS
 import {importRequest} from '../../../../lib/object-imports';
 import {applyMappings,type IntegrationMapping} from '../../../../../../packages/objects/src/mapping';
 import {attachmentRequest} from '../../../../lib/object-attachments';
+import {sendWorkspaceActionEmails} from '../../../../lib/resend-notifications';
 export const runtime='nodejs';export const dynamic='force-dynamic';
 const uuid=z.string().uuid();
 const documentBody=z.object({schemaId:uuid,revision:z.number().int().min(0),values:z.record(z.string(),z.unknown()),lines:z.record(z.string(),z.record(z.string(),z.unknown()))}).strict();
@@ -32,6 +33,21 @@ async function run(request:NextRequest,paths:string[]){
   if(!id)return listObjects(c,type,request);
   uuid.parse(id);const object=await objectRecord(c,type,id);
   if(!write)return objectDetail(c,type,id);
+  if(type==='invoice'&&action==='document'){
+   const party=z.object({name:z.string().trim().max(300),address:z.string().trim().max(1200),tax_id:z.string().trim().max(80)}).strict();
+   const input=z.object({expectedUpdatedAt:z.string().refine(value=>Number.isFinite(Date.parse(value)),{message:'Invalid ISO datetime'}),invoice:z.object({invoice_number:z.string().trim().min(1).max(120),invoice_date:z.string().date().nullable(),due_date:z.string().date().nullable(),currency:z.string().regex(/^[A-Z]{3}$/),subtotal:z.number().finite().nonnegative().max(1e12).nullable(),tax:z.number().finite().nonnegative().max(1e12).nullable(),total:z.number().finite().nonnegative().max(1e12).nullable(),po_id:uuid.nullable(),bill_to:party,ship_to:party}),lines:z.array(z.object({id:uuid,sku:z.string().trim().max(120).nullable(),description:z.string().trim().min(1).max(1000),quantity:z.number().finite().positive().max(1e9),unit_price:z.number().finite().nonnegative().max(1e12),amount:z.number().finite().nonnegative().max(1e12)})).max(500)}).strict().parse(await json(request));
+   if(input.invoice.po_id)await objectRecord(c,'purchase_order',input.invoice.po_id);
+   if(['APPROVED','AUTO_APPROVED','REJECTED','AUTO_REJECTED','PAID'].includes(String(object.status)))throw new WorkspaceError('A completed invoice is locked. Reopen it through the review workflow before editing.',409);
+   if(object.status==='PENDING_APPROVAL')throw new WorkspaceError('This invoice is awaiting approval. Cancel its approval request before editing the document.',409);
+   const currentLines=await c.db.from('invoice_lines').select('id').eq('organization_id',c.organizationId).eq('invoice_id',id);if(currentLines.error)throw currentLines.error;
+   const known=new Set((currentLines.data??[]).map(line=>line.id));if(input.lines.length!==known.size||input.lines.some(line=>!known.has(line.id)))throw new WorkspaceError('Invoice lines changed in another session. Reload before saving.',409);
+   const current=await c.db.from('invoices').select('updated_at,bill_to,ship_to,po_id').eq('organization_id',c.organizationId).eq('id',id).single();if(current.error||current.data.updated_at!==input.expectedUpdatedAt)throw new WorkspaceError('This invoice changed in another session. Reload before saving.',409);
+   const before={invoice:object,parties:{bill_to:current.data.bill_to,ship_to:current.data.ship_to,po_id:current.data.po_id},lines:currentLines.data};
+   const updated=await c.db.from('invoices').update({...input.invoice,updated_at:new Date().toISOString()}).eq('organization_id',c.organizationId).eq('id',id).eq('updated_at',input.expectedUpdatedAt).select('updated_at').maybeSingle();if(updated.error)throw updated.error;if(!updated.data)throw new WorkspaceError('This invoice changed in another session. Reload before saving.',409);
+   for(const line of input.lines){const result=await c.db.from('invoice_lines').update({sku:line.sku,description:line.description,quantity:line.quantity,unit_price:line.unit_price,amount:line.amount,updated_at:new Date().toISOString()}).eq('organization_id',c.organizationId).eq('invoice_id',id).eq('id',line.id);if(result.error)throw new WorkspaceError('Invoice details were saved, but a line item could not be updated. Reload the invoice and check its saved values.',503)}
+   const audit=await c.db.from('audit_events').insert({organization_id:c.organizationId,invoice_id:id,actor_type:'HUMAN',actor_id:c.userId,event_type:'INVOICE_DOCUMENT_EDITED',description:'Invoice document fields edited by an organization member',metadata:{before,after:{invoice:input.invoice,lines:input.lines}}});if(audit.error)throw new WorkspaceError('Invoice changes were saved, but the audit event could not be recorded. Contact your organization admin.',503);
+   return {updatedAt:updated.data.updated_at,validationRequired:true};
+  }
   if(action==='fields'){
    const input=documentBody.parse(await json(request));const s=await c.db.from('object_schema_versions').select('configuration').eq('organization_id',c.organizationId).eq('object_type',type).eq('id',input.schemaId).single();if(s.error)throw new WorkspaceError('Schema not found.');
    const schema=configurationSchema.parse(s.data.configuration);const line=lineTables[type];const lr=line?await c.db.from(line.table).select('id').eq('organization_id',c.organizationId).eq(line.parent,id):{data:[],error:null};if(lr.error)throw lr.error;
@@ -45,8 +61,9 @@ async function run(request:NextRequest,paths:string[]){
   }
   if(action==='messages'){
    const input=z.object({body:z.string().trim().min(1).max(10000),parentId:uuid.nullable().optional(),mentions:z.array(z.string()).max(20).default([])}).parse(await json(request));await ensureMembers(c,input.mentions);
-   if(input.parentId){const p=await c.db.from('object_messages').select('id').eq('organization_id',c.organizationId).eq('object_type',type).eq('object_id',id).eq('id',input.parentId).is('parent_id',null).single();if(p.error)throw new WorkspaceError('Reply thread was not found.');}
+   let parentAuthor:string|null=null;if(input.parentId){const p=await c.db.from('object_messages').select('id,created_by').eq('organization_id',c.organizationId).eq('object_type',type).eq('object_id',id).eq('id',input.parentId).is('parent_id',null).single();if(p.error)throw new WorkspaceError('Reply thread was not found.');parentAuthor=p.data.created_by;}
    const {data,error}=await c.db.from('object_messages').insert({organization_id:c.organizationId,object_type:type,object_id:id,parent_id:input.parentId,body:input.body,mentions:input.mentions,created_by:c.userId,author_name:c.name}).select('id').single();if(error)throw error;
+   await sendWorkspaceActionEmails({db:c.db,organizationId:c.organizationId,actorId:c.userId,recipientIds:[...input.mentions,...(parentAuthor?[parentAuthor]:[])],objectType:type,objectId:id,eventId:data.id,title:input.parentId?'Discussion updated':'You were mentioned',message:input.body.slice(0,500)});
    return data;
   }
   if(action==='message'){
@@ -61,6 +78,8 @@ async function run(request:NextRequest,paths:string[]){
   if(action==='assign'){
    const input=z.object({assignee:z.string().nullable(),waiting_on:z.string().nullable(),reason:z.string().max(500),due_date:z.string().date().nullable(),tags:z.array(z.string().trim().min(1).max(40)).max(20)}).parse(await json(request));await ensureMembers(c,[input.assignee,input.waiting_on].filter((v):v is string=>!!v));
    const {error}=await c.db.from('object_assignments').upsert({...input,organization_id:c.organizationId,object_type:type,object_id:id,updated_by:c.userId,updated_at:new Date().toISOString()});if(error)throw error;
+   const assignmentAt=new Date().toISOString();
+   await sendWorkspaceActionEmails({db:c.db,organizationId:c.organizationId,actorId:c.userId,recipientIds:[input.assignee,input.waiting_on].filter((value):value is string=>!!value),objectType:type,objectId:id,eventId:assignmentAt,title:'Work assigned to you',message:input.reason||'A record requires your attention.'});
    return {ok:true};
   }
   void object;
@@ -75,13 +94,23 @@ async function run(request:NextRequest,paths:string[]){
   const r=await c.db.from('object_notifications').select('*').eq('organization_id',c.organizationId).eq('recipient',c.userId).order('created_at',{ascending:false}).limit(50);if(r.error)throw r.error;return {notifications:r.data};
  }
  if(area==='my-work'){
-  const [assigned,notices,reviews,imports,runs]=await Promise.all([
+  const [assigned,notices,reviews,imports,runs,approvalRequests,member]=await Promise.all([
    c.db.from('object_assignments').select('*').eq('organization_id',c.organizationId).or(`assignee.eq.${c.userId},waiting_on.eq.${c.userId}`).order('updated_at',{ascending:false}).limit(100),
    c.db.from('object_notifications').select('*').eq('organization_id',c.organizationId).eq('recipient',c.userId).is('read_at',null).limit(50),
    c.db.from('review_cases').select('id,invoice_id,status,created_at').eq('organization_id',c.organizationId).eq('status','OPEN').limit(50),
    c.db.from('data_import_jobs').select('id,filename,status,created_at').eq('organization_id',c.organizationId).eq('created_by',c.userId).order('created_at',{ascending:false}).limit(20),
    c.db.from('agent_runs').select('id,invoice_id,status,created_at').eq('organization_id',c.organizationId).eq('status','FAILED').order('created_at',{ascending:false}).limit(20),
-  ]);if([assigned,notices,reviews,imports,runs].some(r=>r.error))throw new WorkspaceError('My Work could not be loaded.',503);return {assigned:assigned.data,notifications:notices.data,reviews:reviews.data,imports:imports.data,runs:runs.data,userId:c.userId};
+   c.db.from('approval_requests').select('id,invoice_id,rule_name,status,current_step,requested_at,due_at,requested_by,evidence,invoice_updated_at').eq('organization_id',c.organizationId).eq('status','PENDING').order('requested_at',{ascending:false}).limit(100),
+   c.db.from('organization_memberships').select('role').eq('organization_id',c.organizationId).eq('workos_user_id',c.userId).eq('status','ACTIVE').single(),
+  ]);if([assigned,notices,reviews,imports,runs,approvalRequests,member].some(r=>r.error))throw new WorkspaceError('My Work could not be loaded.',503);
+  const pendingIds=(approvalRequests.data??[]).map(item=>item.id);const pendingInvoiceIds=[...new Set((approvalRequests.data??[]).map(item=>item.invoice_id))];
+  const [approvalSteps,approvalInvoices]=await Promise.all([
+   pendingIds.length?c.db.from('approval_steps').select('request_id,step_number,approver_user_id,approver_role,approval_mode,status,authority_limit').eq('organization_id',c.organizationId).in('request_id',pendingIds).eq('status','PENDING'):Promise.resolve({data:[],error:null}),
+   pendingInvoiceIds.length?c.db.from('invoices').select('id,invoice_number,total,currency,status,updated_at,vendor_id').eq('organization_id',c.organizationId).in('id',pendingInvoiceIds):Promise.resolve({data:[],error:null})
+  ]);if(approvalSteps.error||approvalInvoices.error)throw new WorkspaceError('Pending approvals could not be loaded.',503);
+  const currentSteps=approvalSteps.data??[];const requestById=new Map((approvalRequests.data??[]).map(item=>[item.id,item]));const eligibleRequests=new Set(currentSteps.filter(step=>step.step_number===requestById.get(step.request_id)?.current_step&&(step.approver_user_id===c.userId||step.approver_role===member.data?.role)).map(step=>step.request_id));
+  const approvals=(approvalRequests.data??[]).filter(item=>eligibleRequests.has(item.id)).map(item=>({...item,invoice:(approvalInvoices.data??[]).find(invoice=>invoice.id===item.invoice_id)??null}));
+  return {assigned:assigned.data,notifications:notices.data,reviews:reviews.data,imports:imports.data,runs:runs.data,approvals,userId:c.userId};
  }
  if(area==='search'){
   const q=(request.nextUrl.searchParams.get('q')??'').trim();if(q.length<2)return {results:[]};if(q.length>100)throw new WorkspaceError('Search is too long.');

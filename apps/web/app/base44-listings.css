@@ -92,3 +92,12 @@
 .app-shell.sidebar-collapsed .page-container{margin-left:76px}
 @media(max-width:1050px){.invoice-list-tabs{grid-template-columns:minmax(0,1fr) auto}.invoice-list-tabs>.tabs{gap:14px}.invoice-data-table{min-width:1080px}}
 @media(max-width:700px){.invoice-list-tabs{align-items:end;grid-template-columns:minmax(0,1fr) auto}.invoice-list-tabs>.tabs{gap:14px;max-width:calc(100vw - 108px)}.invoice-view-button{font-size:0;width:30px;padding:0}.invoice-list-toolbar{flex-wrap:wrap}.invoice-list-toolbar .search-box{width:calc(100% - 150px)}.invoice-list-toolbar .table-count{margin-left:auto}.invoice-upload-slot{width:100%}.invoice-upload-slot .button{width:100%}.filter-drawer{width:min(100%,480px)}.filter-drawer-footer{padding:8px 10px}.filter-drawer-footer .button{padding:6px 8px}.app-shell.sidebar-collapsed .sidebar{width:248px}.app-shell.sidebar-collapsed .sidebar-brand{padding:0 16px;justify-content:initial}.app-shell.sidebar-collapsed .sidebar-brand>strong,.app-shell.sidebar-collapsed .sidebar-app-badge,.app-shell.sidebar-collapsed .workspace-picker,.app-shell.sidebar-collapsed .nav-heading,.app-shell.sidebar-collapsed .nav-item span,.app-shell.sidebar-collapsed .sidebar-footer{display:initial}.app-shell.sidebar-collapsed .nav-item{justify-content:flex-start;width:auto;height:auto;padding:8px 12px}.app-shell.sidebar-collapsed .sidebar nav .nav-heading{height:auto;margin:12px 12px 5px;padding:11px 0 0;background:none;font-size:10px;line-height:normal;border-top:1px solid #dfe6ef}}
+
+/* Row preview affordance and focus treatment, using the existing ZAMP blue tokens. */
+.invoice-data-table tbody .invoice-preview-row{cursor:pointer;transition:background-color .12s ease}
+.invoice-data-table tbody .invoice-preview-row:hover{background:#f4f8ff}
+.invoice-data-table tbody .invoice-preview-row:focus-visible{outline:2px solid #6b98ef;outline-offset:-2px;background:#f4f8ff}
+.invoice-number-preview{appearance:none;border:0;background:none;padding:0;color:#2865f6;font:inherit;font-weight:650;text-decoration:underline;text-decoration-color:transparent;text-underline-offset:3px;cursor:pointer}
+.invoice-number-preview:hover,.invoice-preview-row:hover .invoice-number-preview{text-decoration-color:currentColor}
+.invoice-number-preview:focus-visible{outline:2px solid #6b98ef;outline-offset:3px;border-radius:2px}
+@media(prefers-reduced-motion:reduce){.invoice-data-table tbody .invoice-preview-row{transition:none}}

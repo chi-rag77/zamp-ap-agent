@@ -13,7 +13,7 @@ export type PolicyConfiguration=z.infer<typeof PolicyConfigurationSchema>;
 export interface InvoicePolicy {id:string;name:string;version:string;status:'ACTIVE'|'DRAFT'|'ARCHIVED';configuration:PolicyConfiguration;effectiveFrom:string|null}
 export type Decision='AUTO_APPROVE'|'NEEDS_REVIEW'|'AUTO_REJECT'|'CANNOT_DECIDE';
 export type ReasonCode='APPROVAL_RULES_PASSED'|'APPROVAL_LIMIT_EXCEEDED'|'MISSING_PURCHASE_ORDER'|'AMBIGUOUS_VENDOR'|'AMBIGUOUS_PURCHASE_ORDER'|'VENDOR_MISMATCH'|'CURRENCY_MISMATCH'|'LOW_EXTRACTION_CONFIDENCE'|'PRICE_VARIANCE_EXCEEDED'|'QUANTITY_VARIANCE_EXCEEDED'|'PO_BILLING_QUANTITY_EXCEEDED'|'TOTAL_VARIANCE_EXCEEDED'|'SUBTOTAL_MISMATCH'|'TAX_MISMATCH'|'TOTAL_MISMATCH'|'LINE_MISMATCH'|'TWO_WAY_MATCH_FAILED'|'THREE_WAY_MATCH_FAILED'|'POSSIBLE_DUPLICATE'|'CONFIRMED_DUPLICATE'|'BLOCKED_VENDOR'|'ALREADY_PROCESSED'|'POLICY_UNAVAILABLE'|'INVALID_VALIDATION_RESULT'|'POLICY_EVALUATION_ERROR';
-export interface PolicyEvidence {check:string;field?:string;expected?:unknown;actual?:unknown;threshold?:number;variance?:number;operator?:'EQ'|'NEQ'|'GT'|'GTE'|'LT'|'LTE';source:string;description:string}
+export interface PolicyEvidence {check:string;field?:string;expected?:unknown;actual?:unknown;threshold?:number;variance?:number;status?:'PASS'|'FAIL'|'WARNING'|'SKIPPED';operator?:'EQ'|'NEQ'|'GT'|'GTE'|'LT'|'LTE';source:string;description:string}
 export interface PolicyDecision {invoiceId:string;validationRunId:string|null;decision:Decision;confidence:number;policyId:string|null;policyVersion:string|null;reasonCode:ReasonCode;summary:string;blockers:ReasonCode[];warnings:ReasonCode[];evidence:PolicyEvidence[];recommendedAction:'APPROVE'|'HUMAN_REVIEW'|'REJECT'|'RETRY'|'ESCALATE';evaluatedAt:string;evaluationDurationMs:number}
 export interface EvaluationContext {extractionConfidence:number|null;vendorStatus?:string|null;alreadyProcessed?:boolean;invoiceAmount?:string|null;currency?:string|null}
 const allowedStatus=new Set(['PASS','FAIL','INCOMPLETE']);
@@ -23,7 +23,7 @@ const validValidation=(v:unknown):v is InvoiceValidationResult=>!!v&&typeof v===
 const summaryFor=(decision:Decision,code:ReasonCode)=>decision==='AUTO_APPROVE'?'Invoice satisfies every configured automatic approval condition.':decision==='AUTO_REJECT'?`Invoice meets the configured rejection rule: ${code.replaceAll('_',' ').toLowerCase()}.`:decision==='NEEDS_REVIEW'?`Human review is required: ${code.replaceAll('_',' ').toLowerCase()}.`:`Policy evaluation cannot safely complete: ${code.replaceAll('_',' ').toLowerCase()}.`;
 export function evaluateInvoicePolicy(validation:InvoiceValidationResult|null|undefined,policy:InvoicePolicy|null|undefined,context:EvaluationContext={extractionConfidence:null}):PolicyDecision{
   const start=performance.now();
-  const found: {code:ReasonCode;description:string;check:string;expected?:unknown;actual?:unknown;threshold?:number;variance?:number}[]=[];
+  const found: {code:ReasonCode;description:string;check:string;expected?:unknown;actual?:unknown;threshold?:number;variance?:number;status?:PolicyEvidence['status']}[]=[];
   const add=(code:ReasonCode,description:string,check:string,extra:Partial<(typeof found)[number]>={})=>{if(!found.some(f=>f.code===code&&f.check===check))found.push({code,description,check,...extra})};
   let decision:Decision='CANNOT_DECIDE',reasonCode:ReasonCode='POLICY_EVALUATION_ERROR';
   try {
@@ -71,11 +71,65 @@ export function evaluateInvoicePolicy(validation:InvoiceValidationResult|null|un
       if(unknown.length){decision='CANNOT_DECIDE';reasonCode=unknown[0]}
       else if(reject.length){decision='AUTO_REJECT';reasonCode=reject[0]}
       else if(review.length){decision='NEEDS_REVIEW';reasonCode=review[0]}
-      else if(validation.status==='PASS'||validation.status==='FAIL'){decision='AUTO_APPROVE';reasonCode='APPROVAL_RULES_PASSED';add(reasonCode,'All configured conditions passed','POLICY')}
+      else if(validation.status==='PASS'||validation.status==='FAIL'){decision='AUTO_APPROVE';reasonCode='APPROVAL_RULES_PASSED'}
       else {decision='CANNOT_DECIDE';reasonCode='INVALID_VALIDATION_RESULT';add(reasonCode,'Validation is incomplete','VALIDATION')}
+
+      // Persist the policy's evaluated conditions, not only the first triggered exception.
+      // This is the evidence shown in the decision's Actual vs Allowed table.
+      const recordRule=(name:string,description:string,actual:unknown,expected:unknown,status:NonNullable<PolicyEvidence['status']>,extra:Pick<PolicyEvidence,'threshold'|'variance'>={})=>{
+        const existing=found.find(item=>item.check===name);
+        if(existing){existing.status=status;existing.actual??=actual;existing.expected??=expected;existing.threshold??=extra.threshold;existing.variance??=extra.variance;return}
+        found.push({code:status==='PASS'?'APPROVAL_RULES_PASSED':reasonCode,check:name,description,actual,expected,status,...extra});
+      };
+      const statusOf=(name:string):NonNullable<PolicyEvidence['status']>=>{
+        const rows=check(name);if(!rows.length||rows.some(row=>row.status==='SKIPPED'||row.status==='WARNING'))return 'WARNING';
+        return rows.every(row=>row.status==='PASS')?'PASS':'FAIL';
+      };
+      const rowsActual=(name:string)=>{
+        const rows=check(name);if(!rows.length)return 'No matching evidence';
+        if(rows.length===1)return rows[0].actual??(rows[0].status==='PASS'?'Pass':'Not available');
+        const passed=rows.filter(row=>row.status==='PASS').length;
+        const variances=rows.map(row=>row.variancePercent).filter((value):value is number=>value!==null&&value!==undefined&&Number.isFinite(value));
+        return variances.length?`${passed}/${rows.length} passed · max ${Math.max(...variances.map(Math.abs)).toFixed(2)}% variance`:`${passed}/${rows.length} passed`;
+      };
+      const rowsExpected=(name:string)=>{
+        const rows=check(name);return rows.length===1?rows[0].expected??'Pass':`All ${rows.length} checks pass`;
+      };
+      if(a.requireVendorMatch)recordRule('VENDOR_MATCH','Vendor must match an active vendor record',validation.vendor.status,'MATCHED',validation.vendor.status==='MATCHED'?'PASS':validation.vendor.status==='AMBIGUOUS'?'WARNING':'FAIL');
+      if(a.requiresPo)recordRule('PO_MATCH','A purchase order is required',validation.purchaseOrder.status,'MATCHED',validation.purchaseOrder.status==='MATCHED'?'PASS':validation.purchaseOrder.status==='AMBIGUOUS'?'WARNING':'FAIL');
+      for(const [name,required,description] of [['CURRENCY_MATCH',a.requireCurrencyMatch,'Invoice currency must match the purchase order'],['LINE_MATCH',a.requireLineMatch,'Required invoice lines must match purchase order lines'],['SUBTOTAL_MATCH',a.requireSubtotalMatch,'Invoice subtotal must reconcile'],['TAX_MATCH',a.requireTaxMatch,'Invoice tax must reconcile'],['TOTAL_MATCH',a.requireTotalMatch,'Invoice total must reconcile']] as const){
+        if(!required)continue;
+        if(name==='LINE_MATCH'){
+          const matched=validation.lineMatches.filter(line=>line.status==='MATCHED').length,total=validation.lineMatches.length;
+          recordRule(name,description,`${matched} / ${total} lines matched`,'All invoice lines matched',total>0&&matched===total?'PASS':matched>0?'WARNING':'FAIL');
+        }else recordRule(name,description,rowsActual(name),rowsExpected(name),statusOf(name));
+      }
+      for(const [name,limit,description] of [['PRICE_MATCH',a.maxPriceVariancePercent,'Maximum line price variance'],['QUANTITY_MATCH',a.maxQuantityVariancePercent,'Maximum billable quantity variance'],['TOTAL_MATCH',a.maxTotalVariancePercent,'Maximum invoice total variance']] as const){
+        const rows=check(name);if(!rows.length)continue;
+        const values=rows.map(row=>row.variancePercent).filter((value):value is number=>value!==null&&value!==undefined&&Number.isFinite(value));
+        const max=values.length?Math.max(...values.map(Math.abs)):null;
+        const amountExceeded=name==='TOTAL_MATCH'&&rows.some(row=>row.varianceAmount!==undefined&&Math.abs(Number(row.varianceAmount))>a.maxAbsoluteAmountVariance);
+        const exceeded=max!==null&&max>limit||amountExceeded||name==='QUANTITY_MATCH'&&rows.some(row=>row.code==='PO_BILLING_QUANTITY_EXCEEDED');
+        const incomplete=rows.some(row=>row.status==='SKIPPED'||row.status==='WARNING')||max===null;
+        const actual=max===null?'Variance unavailable':`${max.toFixed(2)}%${name==='TOTAL_MATCH'&&rows[0].varianceAmount!==undefined?` · ${Math.abs(Number(rows[0].varianceAmount)).toFixed(2)} amount`:''}`;
+        const allowed=name==='TOTAL_MATCH'?`≤ ${limit}% and ≤ ${a.maxAbsoluteAmountVariance} amount`:`≤ ${limit}%`;
+        recordRule(name,description,actual,allowed,incomplete?'WARNING':exceeded?'FAIL':'PASS',{threshold:limit,variance:max??undefined});
+      }
+      const confidenceActual=context.extractionConfidence===null||context.extractionConfidence===undefined?'Unavailable':`${(context.extractionConfidence*100).toFixed(1)}%`;
+      const confidenceStatus=context.extractionConfidence===null||context.extractionConfidence===undefined?'WARNING':context.extractionConfidence>=a.minExtractionConfidence?'PASS':'FAIL';
+      recordRule('EXTRACTION_CONFIDENCE','Extraction confidence must meet the configured minimum',confidenceActual,`≥ ${(a.minExtractionConfidence*100).toFixed(1)}%`,confidenceStatus,{threshold:a.minExtractionConfidence});
+      recordRule('DUPLICATE_CHECK','Duplicate invoices are checked before approval',validation.duplicate.status,'NO_DUPLICATE',validation.duplicate.status==='NO_DUPLICATE'?'PASS':validation.duplicate.status==='POSSIBLE_DUPLICATE'?'WARNING':'FAIL');
+      if(a.requireTwoWayMatch)recordRule('TWO_WAY_MATCH','Required two-way match must pass',validation.twoWayMatch.status,'PASS',validation.twoWayMatch.status==='PASS'?'PASS':validation.twoWayMatch.status==='INCOMPLETE'?'WARNING':'FAIL');
+      if(a.requireThreeWayMatch)recordRule('THREE_WAY_MATCH','Required three-way match must pass',validation.threeWayMatch.status,'PASS',validation.threeWayMatch.status==='PASS'?'PASS':validation.threeWayMatch.status==='INCOMPLETE'?'WARNING':'FAIL');
+      if(c.approvalMatrix){
+        const amount=context.invoiceAmount==null?null:decimal(context.invoiceAmount);
+        const tiers=[...c.approvalMatrix.reviewTiers].sort((left,right)=>right.minimumAmount-left.minimumAmount);
+        const tier=amount&&context.currency===c.approvalMatrix.currency?tiers.find(item=>item.operator==='GT'?amount.gt(decimal(item.minimumAmount)):amount.gte(decimal(item.minimumAmount))):undefined;
+        recordRule('APPROVAL_MATRIX','Invoice amount must stay below the configured approval tier',context.invoiceAmount??'Unavailable',tier?`${tier.operator==='GT'?'>':'≥'} ${c.approvalMatrix.currency} ${tier.minimumAmount} · ${tier.role} review`:`Below configured ${c.approvalMatrix.currency} review tiers`,context.invoiceAmount==null||context.currency!==c.approvalMatrix.currency?'WARNING':tier?'FAIL':'PASS',{threshold:tier?.minimumAmount});
+      }
     }
   }catch{decision='CANNOT_DECIDE';reasonCode='POLICY_EVALUATION_ERROR';add(reasonCode,'Policy evaluator raised an unexpected error','POLICY')}
   const blockers=decision==='AUTO_APPROVE'?[]:found.filter(f=>f.code!=='APPROVAL_RULES_PASSED').map(f=>f.code);
-  return {invoiceId:validation?.invoiceId??'',validationRunId:validation?.runId??null,decision,confidence:decision==='CANNOT_DECIDE'?0:1,policyId:policy?.id??null,policyVersion:policy?.version??null,reasonCode,summary:summaryFor(decision,reasonCode),blockers:[...new Set(blockers)],warnings:[],evidence:found.map(f=>({check:f.check,expected:f.expected,actual:f.actual,threshold:f.threshold,variance:f.variance,source:'phase3_validation',description:f.description})),recommendedAction:decision==='AUTO_APPROVE'?'APPROVE':decision==='AUTO_REJECT'?'REJECT':decision==='NEEDS_REVIEW'?'HUMAN_REVIEW':'RETRY',evaluatedAt:new Date().toISOString(),evaluationDurationMs:Math.max(0,Math.round(performance.now()-start))};
+  return {invoiceId:validation?.invoiceId??'',validationRunId:validation?.runId??null,decision,confidence:decision==='CANNOT_DECIDE'?0:1,policyId:policy?.id??null,policyVersion:policy?.version??null,reasonCode,summary:summaryFor(decision,reasonCode),blockers:[...new Set(blockers)],warnings:[],evidence:found.map(f=>({check:f.check,expected:f.expected,actual:f.actual,threshold:f.threshold,variance:f.variance,status:f.status,source:'phase3_validation',description:f.description})),recommendedAction:decision==='AUTO_APPROVE'?'APPROVE':decision==='AUTO_REJECT'?'REJECT':decision==='NEEDS_REVIEW'?'HUMAN_REVIEW':'RETRY',evaluatedAt:new Date().toISOString(),evaluationDurationMs:Math.max(0,Math.round(performance.now()-start))};
 }
 export {getActivePolicy,evaluateSavedInvoice} from './service';
