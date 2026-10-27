@@ -1,5 +1,6 @@
 import {notFound} from 'next/navigation';
 import {createWebServerClient} from '../../../lib/tenant-database';
+import {createServerClient} from '@zamp/database';
 import {InvoiceCase} from '../../../components/invoice-case';
 import {day,invoiceDisplayStatus,localWorkspace,money,percent,poNumber,vendorName,type InvoiceRow,type VendorRow,type PORow,type ValidationRow,type ExtractionRow,type ReviewRow,type Workspace} from '../../../lib/data';
 
@@ -8,11 +9,11 @@ export default async function InvoiceCasePage({params}:{params:Promise<{id:strin
   const {id}=await params;
   if(!localWorkspace()||!/^[0-9a-f-]{36}$/i.test(id))notFound();
   const db=await createWebServerClient();
-  const invoiceResult=await db.from('invoices').select('id,invoice_number,vendor_id,po_id,invoice_date,due_date,currency,subtotal,tax,total,extraction_confidence,status,decision,source,received_at,current_extraction_id,document_path,updated_at,bill_to,ship_to').eq('id',id).is('archived_at',null).maybeSingle();
+  const invoiceResult=await db.from('invoices').select('id,invoice_number,vendor_id,po_id,invoice_date,due_date,currency,subtotal,tax,total,extraction_confidence,status,decision,source,received_at,current_extraction_id,document_path,updated_at,bill_to,ship_to,organization_id').eq('id',id).is('archived_at',null).maybeSingle();
   if(invoiceResult.error)throw new Error(`Invoice could not be loaded: ${invoiceResult.error.message}`);
   if(!invoiceResult.data)notFound();
   const invoice=invoiceResult.data as InvoiceRow;
-  const [validationResult,extractionResult,reviewResult,vendorResult,runResult,linesResult,documentResult,decisionResult,approvalRequestResult]=await Promise.all([
+  const [validationResult,extractionResult,reviewResult,vendorResult,runResult,linesResult,documentResult,decisionResult]=await Promise.all([
     db.from('invoice_validation_runs').select('id,invoice_id,status,engine_version,result,created_at,run_id').eq('invoice_id',id).order('created_at',{ascending:false}).limit(1),
     db.from('invoice_extractions').select('id,invoice_id,status,overall_confidence,normalized_output,provider,model,created_at').eq('invoice_id',id).eq('is_canonical',true).order('created_at',{ascending:false}).limit(1),
     db.from('review_cases').select('id,invoice_id,status,reason,reason_code,priority,created_at').eq('invoice_id',id).order('created_at',{ascending:false}).limit(10),
@@ -21,9 +22,16 @@ export default async function InvoiceCasePage({params}:{params:Promise<{id:strin
     db.from('invoice_lines').select('id,line_number,description,sku,quantity,unit_price,tax_rate,amount,metadata').eq('invoice_id',id).order('line_number'),
     db.from('invoice_documents').select('id,filename,page_count').eq('invoice_id',id).limit(1),
     db.from('agent_decisions').select('decision,reason_code,summary,policy_version,evidence,blockers,warnings,recommended_action,created_at,validation_run_id').eq('invoice_id',id).order('created_at',{ascending:false}).limit(1).maybeSingle(),
-    db.from('approval_requests').select('id,rule_name,status,current_step,configuration_version,due_at,evidence').eq('invoice_id',id).eq('status','PENDING').order('requested_at',{ascending:false}).limit(1).maybeSingle(),
   ]);
-  if(validationResult.error||extractionResult.error||reviewResult.error||vendorResult.error||runResult.error||linesResult.error||documentResult.error||decisionResult.error||approvalRequestResult.error)throw new Error('Invoice detail could not be loaded');
+  if(validationResult.error||extractionResult.error||reviewResult.error||vendorResult.error||runResult.error||linesResult.error||documentResult.error||decisionResult.error)throw new Error('Invoice detail could not be loaded');
+  // Approval tables are intentionally unavailable to the browser's authenticated
+  // database role. The invoice itself was already loaded through tenant RLS, so use
+  // the server-only client for this optional lookup and constrain it to that tenant.
+  const approvalRequestResult=invoice.organization_id?await createServerClient().from('approval_requests')
+    .select('id,rule_name,status,current_step,configuration_version,due_at,evidence')
+    .eq('organization_id',invoice.organization_id).eq('invoice_id',id).eq('status','PENDING')
+    .order('requested_at',{ascending:false}).limit(1).maybeSingle():{data:null,error:null};
+  if(approvalRequestResult.error)console.error('Invoice approval summary unavailable',{code:approvalRequestResult.error.code});
   const validations=(validationResult.data??[]) as ValidationRow[];
   const extractions=(extractionResult.data??[]) as ExtractionRow[];
   const vendors=(vendorResult.data?[vendorResult.data]:[]) as VendorRow[];
