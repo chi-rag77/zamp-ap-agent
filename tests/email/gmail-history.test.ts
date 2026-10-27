@@ -31,10 +31,20 @@ describe('Gmail history synchronization',()=>{
   expect(state.row).toMatchObject({last_history_id:'200',full_sync_page_token:null,status:'HEALTHY'});
  });
 
- it('keeps the old cursor when incremental processing fails',async()=>{
+ it('advances past a durably failed email so one bad document cannot block the mailbox',async()=>{
+  vi.stubEnv('GMAIL_INVOICE_MAILBOX','ap@example.com');
+  const client={getProfile:async()=>({emailAddress:'ap@example.com',historyId:'200'}),listHistory:async()=>({historyId:'200',history:[{id:'150',messagesAdded:[{message:{id:'bad'}},{message:{id:'good'}}]}]}),listMessages:async()=>({messages:[]})} as unknown as GmailClient;
+  const processed:string[]=[];
+  const result=await syncGmailMailbox(client,async id=>{processed.push(id);return {status:id==='bad'?'FAILED':'PROCESSED'} as never;});
+  expect(result).toMatchObject({processed:1,failed:1,historyId:'200',hasMore:false});
+  expect(processed).toEqual(['bad','good']);
+  expect(state.row).toMatchObject({last_history_id:'200',status:'HEALTHY',last_error:'1 email(s) failed processing and remain available in the review queue.'});
+ });
+
+ it('preserves the cursor when the message cannot be durably recorded',async()=>{
   vi.stubEnv('GMAIL_INVOICE_MAILBOX','ap@example.com');
   const client={getProfile:async()=>({emailAddress:'ap@example.com',historyId:'200'}),listHistory:async()=>({historyId:'200',history:[{id:'150',messagesAdded:[{message:{id:'m1'}}]}]}),listMessages:async()=>({messages:[]})} as unknown as GmailClient;
-  await expect(syncGmailMailbox(client,async()=>({status:'FAILED'} as never))).rejects.toThrow('failed processing');
+  await expect(syncGmailMailbox(client,async()=>{throw new Error('database unavailable')})).rejects.toThrow('database unavailable');
   expect(state.row).toMatchObject({last_history_id:'100',status:'FAILED'});
  });
 
@@ -70,11 +80,12 @@ describe('Gmail history synchronization',()=>{
   expect(state.row).toMatchObject({last_history_id:'250',status:'HEALTHY',full_sync_page_token:null});
  });
 
- it('does not advance the page token when a message fails processing',async()=>{
+ it('advances the full-sync page token after recording a failed message',async()=>{
   vi.stubEnv('GMAIL_INVOICE_MAILBOX','ap@example.com');
   state.row={last_history_id:null,status:'REQUIRES_FULL_SYNC',full_sync_page_token:'retry-this-page'};
   const client={getProfile:async()=>({emailAddress:'ap@example.com',historyId:'250'}),listMessages:async(_query:string,page?:string)=>({messages:[{id:'m1'}],nextPageToken:'next-page',page})} as unknown as GmailClient;
-  await expect(syncGmailMailbox(client,async()=>({status:'FAILED'} as never))).rejects.toThrow('failed processing');
-  expect(state.row).toMatchObject({last_history_id:null,status:'REQUIRES_FULL_SYNC',full_sync_page_token:'retry-this-page'});
+  const result=await syncGmailMailbox(client,async()=>({status:'FAILED'} as never));
+  expect(result).toMatchObject({failed:1,hasMore:true});
+  expect(state.row).toMatchObject({last_history_id:null,status:'REQUIRES_FULL_SYNC',full_sync_page_token:'next-page',last_error:'1 email(s) failed processing and remain available in the review queue.'});
  });
 });
