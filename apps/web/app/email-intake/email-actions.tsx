@@ -11,14 +11,15 @@ export function EmailActions({configured,showFixture=true}:{configured:boolean;s
     if(!response.ok)throw new Error(data.error??'Request failed');
     setMessage(`Fixture processed: ${data.status}`);
    }else{
-    let processed=0,hasMore=true;
+    let processed=0,failed=0,hasMore=true;
     while(hasMore){
      const response=await fetch(path,{method:'POST',headers:{'content-type':'application/json'},body:'{}'});
      const data=await response.json();
      if(!response.ok)throw new Error(data.error??'Request failed');
      processed+=data.processed??0;
+     failed+=data.failed??0;
      hasMore=Boolean(data.hasMore);
-     setMessage(hasMore?`Reading mailbox in batches… ${processed} messages handled so far.`:`Mailbox sync completed: ${processed} message(s)`);
+     setMessage(hasMore?`Reading mailbox in batches… ${processed} messages handled so far.`:`Mailbox sync completed: ${processed} message(s)${failed?`; ${failed} failed and remain in the review queue`:''}`);
     }
    }
    window.location.reload();

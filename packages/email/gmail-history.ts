@@ -75,32 +75,38 @@ export async function syncGmailMailbox(client=new GmailClient(),processMessage=p
    latest=profile.historyId;
   }
 
-  let processed=0;
+  let processed=0,failed=0;
   for(const id of ids){
    let outcome;
    try{outcome=await processMessage(id,{client});}
    catch(error){if(error instanceof EmailError&&error.code==='EMAIL_MESSAGE_NOT_FOUND')continue;throw error;}
-   if(outcome.status==='FAILED')throw new Error(`Email ${id} failed processing`);
-   processed++;
+   // A returned FAILED result is durable: processEmailMessage has written the
+   // intake and its failure details. Keep it visible for review/reprocessing,
+   // but do not let one poison message block later mail or pin the history cursor.
+   if(outcome.status==='FAILED')failed++;
+   else processed++;
   }
 
+  const syncNote=failed?`${failed} email(s) failed processing and remain available in the review queue.`:null;
+
   if(fullSync&&nextFullSyncPageToken){
-   // Advance only after the entire page has been processed. If a message fails,
-   // the previous token remains and the page can be retried without data loss.
+   // The page may advance past per-message failures because their intake failure
+   // has been persisted. Thrown provider/database errors still abort and preserve
+   // the old token so the page can be retried without losing messages.
    const saved=await db.from('email_sync_state').upsert({
     provider:'GMAIL',mailbox,last_history_id:cursor??null,
-    full_sync_page_token:nextFullSyncPageToken,status:'REQUIRES_FULL_SYNC',last_error:null,
+    full_sync_page_token:nextFullSyncPageToken,status:'REQUIRES_FULL_SYNC',last_error:syncNote,
    },{onConflict:'provider,mailbox'});
    if(saved.error)throw saved.error;
-   return {mailbox,fullSync,processed,historyId:cursor??null,hasMore:true};
+   return {mailbox,fullSync,processed,failed,historyId:cursor??null,hasMore:true};
   }
 
   const result=await db.from('email_sync_state').upsert({
    provider:'GMAIL',mailbox,last_history_id:latest,full_sync_page_token:null,
-   last_successful_sync_at:new Date().toISOString(),status:'HEALTHY',last_error:null,
+   last_successful_sync_at:new Date().toISOString(),status:'HEALTHY',last_error:syncNote,
   },{onConflict:'provider,mailbox'});
   if(result.error)throw result.error;
-  return {mailbox,fullSync,processed,historyId:latest,hasMore:false};
+  return {mailbox,fullSync,processed,failed,historyId:latest,hasMore:false};
  }catch(error){
   await db.from('email_sync_state').upsert({
    provider:'GMAIL',mailbox,last_history_id:cursor??null,
