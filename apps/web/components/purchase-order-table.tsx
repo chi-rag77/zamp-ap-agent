@@ -1,6 +1,6 @@
 'use client';
 import {useMemo,useState} from 'react';
-import {ObjectPeek} from './objects/object-workspace';
+import Link from 'next/link';
 import {Badge,Empty} from './ui';
 import {Icon} from './shell';
 
@@ -20,7 +20,6 @@ export function PurchaseOrderTable({rows}:{rows:PurchaseOrderView[]}){
   const [search,setSearch]=useState('');
   const [sortNewest,setSortNewest]=useState(true);
   const [viewsOpen,setViewsOpen]=useState(false);
-  const [peekId,setPeekId]=useState<string|null>(null);
   const tabs:Tab[]=['All','Open','Fully invoiced','Variance'];
   const count=(candidate:Tab)=>candidate==='All'?rows.length:candidate==='Open'?rows.filter(row=>['OPEN','PARTIALLY_RECEIVED'].includes(row.status)).length:candidate==='Fully invoiced'?rows.filter(row=>value(row.remaining)===0&&row.status!=='VARIANCE').length:rows.filter(row=>row.status==='VARIANCE'||value(row.remaining)<0).length;
   const visible=useMemo(()=>rows.filter(row=>{
@@ -44,11 +43,10 @@ export function PurchaseOrderTable({rows}:{rows:PurchaseOrderView[]}){
         <button type="button" className="button" onClick={()=>exportCsv(visible)}><Icon name="download" size={14}/>Export</button>
       </div>
       {visible.length?<>
-        <div className="table-scroll"><table className="data-table listing-table invoice-data-table po-data-table"><thead><tr><th>STATUS</th><th>PURCHASE ORDER</th><th>SUPPLIER</th><th>PO DATE</th><th className="number">PO VALUE</th><th>INVOICED</th><th className="number">REMAINING</th><th>CREATED BY</th></tr></thead><tbody>{visible.map(row=><tr key={row.id} className="invoice-preview-row" tabIndex={0} aria-label={`Preview purchase order ${row.number}`} onClick={()=>setPeekId(row.id)} onKeyDown={event=>{if(event.target===event.currentTarget&&(event.key==='Enter'||event.key===' ')){event.preventDefault();setPeekId(row.id)}}}>
-          <td><Badge label={row.status}/></td><td><button type="button" className="invoice-number-preview" aria-haspopup="dialog" onClick={event=>{event.stopPropagation();setPeekId(row.id)}}>{row.number}</button></td><td>{row.supplier}</td><td>{row.date}</td><td className="number">{row.amount}</td><td>{row.invoiced}</td><td className={`number ${value(row.remaining)<0?'text-warning':''}`}>{row.remaining}</td><td className="muted">{row.creator}</td>
+        <div className="table-scroll"><table className="data-table listing-table invoice-data-table po-data-table"><thead><tr><th>STATUS</th><th>PURCHASE ORDER</th><th>SUPPLIER</th><th>PO DATE</th><th className="number">PO VALUE</th><th>INVOICED</th><th className="number">REMAINING</th><th>CREATED BY</th></tr></thead><tbody>{visible.map(row=><tr key={row.id}>
+          <td><Badge label={row.status}/></td><td><Link className="invoice-number-preview" href={`/objects/purchase_order/${row.id}`}>{row.number}</Link></td><td>{row.supplier}</td><td>{row.date}</td><td className="number">{row.amount}</td><td>{row.invoiced}</td><td className={`number ${value(row.remaining)<0?'text-warning':''}`}>{row.remaining}</td><td className="muted">{row.creator}</td>
         </tr>)}</tbody></table></div><div className="table-footer"><span>Showing {visible.length} of {rows.length}</span><span>Connected workspace</span></div>
       </>:<Empty title="No purchase orders match" message="Try another search or status filter."/>}
     </div>
-    {peekId&&<ObjectPeek type="purchase_order" id={peekId} close={()=>setPeekId(null)}/>}
   </>;
 }
