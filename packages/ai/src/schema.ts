@@ -24,9 +24,9 @@ const buyer = z.object({name:nullableText,taxId:nullableText,address:nullableTex
 export const ExtractedInvoiceSchema = z.object({
   documentType:z.enum(['INVOICE','NOT_INVOICE','UNKNOWN']),
   invoiceNumber:nullableText, invoiceDate:nullableText, dueDate:nullableText,
-  vendor:party, buyer,
+  vendor:party, buyer, shipTo:buyer,
   poNumber:nullableText, currency:nullableText,
-  lineItems:z.array(z.object({lineNumber:z.number().int().positive(),description:z.string().trim().min(1),sku:nullableText,quantity:money,unitPrice:money,taxRate,amount:money,provenance:z.object({page:z.number().int().positive().nullable()}).optional()})).default([]),
+  lineItems:z.array(z.object({lineNumber:z.number().int().positive(),itemName:nullableText,description:z.string().trim().min(1),sku:nullableText,quantity:money,uom:nullableText,unitPrice:money,taxRate,amount:money,provenance:z.object({page:z.number().int().positive().nullable()}).optional()})).default([]),
   subtotal:money,tax:money,total:money,paymentTerms:nullableText,
   confidence:z.object({invoiceNumber:confidence,invoiceDate:confidence,dueDate:confidence,vendor:confidence,buyer:confidence,poNumber:confidence,lineItems:confidence,subtotal:confidence,tax:confidence,total:confidence,currency:confidence}).partial().default({}),
   provenance:z.object({invoiceNumber:provenance,invoiceDate:provenance,dueDate:provenance,vendor:provenance,buyer:provenance,poNumber:provenance,subtotal:provenance,tax:provenance,total:provenance,currency:provenance}).partial().default({})

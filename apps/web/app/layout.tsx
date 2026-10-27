@@ -2,6 +2,7 @@ import './globals.css';
 import './base44-listings.css';
 import './realtime.css';
 import './login.css';
+import './approval-email.css';
 import localFont from 'next/font/local';
 import {Shell} from '../components/shell';
 import {vercelWorkspaceEnabled} from '../lib/data';

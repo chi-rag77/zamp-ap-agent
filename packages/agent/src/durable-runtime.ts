@@ -8,6 +8,7 @@ import {initializeContext} from './context';
 import {assertTransition} from './state-machine';
 import {getRun} from './run-manager';
 import {isTransient} from './retry';
+import {approvalRules,evaluateApprovalRules,type ApprovalInput} from '../../approval/index';
 
 type Job={id:string;run_id:string;invoice_id:string;step_key:string;attempt:number;max_attempts:number};
 const db=()=>createServerClient();
@@ -98,6 +99,11 @@ async function advance(context:AgentContext,step:string):Promise<StageResult>{
    const {data:run,error}=await db().from('agent_runs').select('policy_version').eq('id',context.runId).single();
    if(error)throw new AgentError('CHECKPOINT_FAILED',error.message);
    if(context.policy&&run.policy_version!==context.policy.version)throw new AgentError('STALE_DECISION','Policy changed during evaluation; the decision will not be executed');
+   if(context.policyDecision?.decision==='AUTO_APPROVE'){
+    const approval=await routeConfiguredApproval(context);
+    if(approval.status==='ROUTED')return {nextStep:null,runStatus:'WAITING',decision:'PENDING_APPROVAL',summary:`Approval required under ${approval.ruleName}. Assigned to ${approval.approverCount} eligible approver${approval.approverCount===1?'':'s'}.`,reasonCode:'APPROVAL_RULE_MATCHED',actionExecuted:'CREATE_APPROVAL_REQUEST',verificationStatus:'VERIFIED'};
+    if(approval.status==='REVIEW_REQUIRED')return {nextStep:null,runStatus:'WAITING',decision:'NEEDS_REVIEW',summary:approval.message,reasonCode:'APPROVER_NOT_FOUND',actionExecuted:'HOLD_FOR_REVIEW',verificationStatus:'VERIFIED'};
+   }
    move(context,'DECISION_READY');return {nextStep:'ACTION_GUARD',runStatus:'RUNNING',summary:String(output.summary??'Policy decision evaluated'),reasonCode:String(output.reasonCode??'')};
   }
   case 'ACTION_GUARD':{
@@ -129,6 +135,53 @@ async function advance(context:AgentContext,step:string):Promise<StageResult>{
   }
   default:throw new AgentError('UNKNOWN_AGENT_STEP',step);
  }
+}
+
+async function routeConfiguredApproval(context:AgentContext):Promise<{status:'NONE'|'ROUTED'|'REVIEW_REQUIRED';ruleName?:string;approverCount?:number;message?:string}>{
+ const client=db();
+ const {data:invoice,error:invoiceError}=await client.from('invoices').select('id,organization_id,invoice_number,total,currency,vendor_id,po_id,status,updated_at').eq('id',context.invoiceId).single();
+ if(invoiceError||!invoice)throw new AgentError('APPROVAL_ROUTING_FAILED','Invoice context could not be loaded for approval evaluation');
+ const {data:configuration,error}=await client.from('approval_configurations').select('id,version,name,rules').eq('organization_id',invoice.organization_id).eq('status','ACTIVE').maybeSingle();
+ if(error)throw new AgentError('APPROVAL_ROUTING_FAILED','Active approval rules could not be loaded');
+ if(!configuration)return {status:'NONE'};
+ const rules=approvalRules.safeParse(configuration.rules);if(!rules.success)throw new AgentError('APPROVAL_ROUTING_FAILED','Active approval rules are invalid');
+ const {data:validation,error:validationError}=await client.from('invoice_validation_runs').select('result').eq('organization_id',invoice.organization_id).eq('invoice_id',invoice.id).order('created_at',{ascending:false}).limit(1).maybeSingle();
+ if(validationError)throw new AgentError('APPROVAL_ROUTING_FAILED','Invoice validation evidence could not be loaded');
+ const checks=(validation?.result as {checks?:{check:string;status:string;variancePercent?:number}[]}|undefined)?.checks??[];
+ const input:ApprovalInput={invoice_amount:Number(invoice.total??0),currency:invoice.currency,variance_percent:Math.max(0,...checks.filter(check=>check.check==='PRICE_MATCH').map(check=>Math.abs(Number(check.variancePercent)||0))),department:'',invoice_type:'STANDARD',vendor_match:!!invoice.vendor_id,po_match:!!invoice.po_id,duplicate:context.validation?.duplicate.status==='CONFIRMED_DUPLICATE'||context.validation?.duplicate.status==='POSSIBLE_DUPLICATE',risk_flag:context.policyDecision?.decision==='NEEDS_REVIEW'};
+ const evaluation=evaluateApprovalRules(rules.data,input);
+ if(evaluation.conflict)throw new AgentError('APPROVAL_RULE_CONFLICT','Approval rules with the same priority matched this invoice');
+ if(!evaluation.matchedRule)return {status:'NONE'};
+ const [roles,members]=await Promise.all([
+  client.from('organization_roles').select('role_key,permissions').eq('organization_id',invoice.organization_id),
+  client.from('organization_memberships').select('workos_user_id,role,approval_limit,approval_currency,approval_categories,status').eq('organization_id',invoice.organization_id).eq('status','ACTIVE')
+ ]);
+ if(roles.error||members.error)throw new AgentError('APPROVAL_ROUTING_FAILED','Eligible approvers could not be checked');
+ const route:Array<{stepNumber:number;approverUserId:string;approverRole:null;authorityLimit:number;currency:string;mode:string}> = [];
+ let routedStep=0;
+ for(const step of evaluation.route){
+  const eligible=(members.data??[]).filter(member=>{
+   const role=roles.data?.find(item=>item.role_key===member.role);
+   return role?.permissions?.includes('invoices.approve')&&member.approval_limit!==null&&Number(member.approval_limit)>=Math.max(Number(invoice.total??0),step.authorityLimit)&&member.approval_currency===step.currency&&member.approval_categories?.includes('INVOICES')&&(step.approverType==='ROLE'?member.role===step.approverRef:member.workos_user_id===step.approverRef);
+  });
+  if(!eligible.length)continue;
+  routedStep++;
+  const selected=step.mode==='SEQUENTIAL'?eligible.slice(0,1):eligible;
+  for(const member of selected)route.push({stepNumber:routedStep,approverUserId:member.workos_user_id,approverRole:null,authorityLimit:Math.max(Number(invoice.total??0),step.authorityLimit),currency:step.currency,mode:step.mode});
+ }
+ if(!route.length)return holdForApproverReview(client,invoice,context,`Approval rule “${evaluation.matchedRule.name}” has no active approver with sufficient authority.`);
+ const {error:requestError}=await client.rpc('create_invoice_approval_request',{p_org:invoice.organization_id,p_invoice:invoice.id,p_actor:'system-agent',p_configuration:configuration.id,p_rule_id:evaluation.matchedRule.ruleId,p_rule_name:evaluation.matchedRule.name,p_expected_updated_at:invoice.updated_at,p_evidence:{configurationName:configuration.name,configurationVersion:configuration.version,input,evaluation:evaluation.evaluations.filter(item=>item.matched),policyDecision:context.policyDecision?.decision},p_route:route,p_due_at:null});
+ if(requestError){if(requestError.message.includes('APPROVAL_ALREADY_PENDING'))return {status:'ROUTED',ruleName:evaluation.matchedRule.name,approverCount:route.length};if(requestError.message.includes('APPROVER_NOT_ELIGIBLE'))return holdForApproverReview(client,invoice,context,`Approval rule “${evaluation.matchedRule.name}” no longer has an eligible approver.`);throw new AgentError('APPROVAL_ROUTING_FAILED','The matched approval route could not be created');}
+ return {status:'ROUTED',ruleName:evaluation.matchedRule.name,approverCount:route.length};
+}
+
+async function holdForApproverReview(client:ReturnType<typeof db>,invoice:{id:string;organization_id:string;updated_at:string;invoice_number:string|null},context:AgentContext,message:string){
+ const {data,error}=await client.from('invoices').update({status:'NEEDS_REVIEW',decision:'NEEDS_REVIEW',decision_reason:message,updated_at:new Date().toISOString()}).eq('organization_id',invoice.organization_id).eq('id',invoice.id).eq('updated_at',invoice.updated_at).select('id').maybeSingle();
+ if(error||!data)throw new AgentError('APPROVAL_ROUTING_FAILED','The invoice changed while the unavailable approval route was being escalated');
+ const {data:admins,error:adminError}=await client.from('organization_memberships').select('workos_user_id').eq('organization_id',invoice.organization_id).eq('status','ACTIVE').in('role',['OWNER','ADMIN']);
+ if(adminError)throw new AgentError('APPROVAL_ROUTING_FAILED','The invoice was held for review, but organization administrators could not be notified');
+ if(admins?.length){const notices=admins.map(admin=>({organization_id:invoice.organization_id,object_type:'invoice',object_id:invoice.id,recipient:admin.workos_user_id,title:'Approval route needs attention',message:`${invoice.invoice_number??'An invoice'} needs review because its approval rule has no eligible approver.`}));await client.from('object_notifications').insert(notices)}
+ return {status:'REVIEW_REQUIRED' as const,message};
 }
 
 function move(context:AgentContext,next:AgentState){if(context.state===next)return;assertTransition(context.state,next);context.state=next}
