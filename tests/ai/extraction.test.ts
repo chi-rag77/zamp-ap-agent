@@ -39,6 +39,15 @@ describe('NVIDIA provider',()=>{
     const result=await new NvidiaVisionProvider(config,fetcher as typeof fetch).extractInvoice(input);
     expect(result.extraction.invoiceNumber).toBe('INV-1048');
   });
+  it('uses the observed item name when a separate line description is blank',async()=>{
+    const invoice=await fixture('perfect-invoice.json');
+    invoice.lineItems[0].description='';
+    invoice.lineItems[0].itemName='Industrial supplies';
+    const fetcher=vi.fn(async()=>new Response(JSON.stringify({choices:[{message:{content:JSON.stringify(invoice)},finish_reason:'stop'}]}),{status:200}));
+    const result=await new NvidiaVisionProvider(config,fetcher as typeof fetch).extractInvoice(input);
+    expect(result.extraction.lineItems[0].description).toBe(result.extraction.lineItems[0].itemName);
+    expect(fetcher).toHaveBeenCalledTimes(1);
+  });
   it('turns off Nano Omni reasoning and bounds its JSON output',async()=>{
     const invoice=await fixture('perfect-invoice.json');
     const fetcher=vi.fn(async (_url:string,request:RequestInit)=>{

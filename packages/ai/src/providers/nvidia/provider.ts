@@ -4,6 +4,25 @@ import type { InvoiceVisionInput, VisionModelProvider, VisionResult } from '../v
 import { NvidiaClient, nvidiaConfig, type NvidiaConfig } from './client';
 import { ExtractionError } from './errors';
 
+/**
+ * Some invoices have a single printed item label rather than separate name and
+ * description columns. If the model extracted that label as itemName but left
+ * description blank, use the same observed text for both fields. This is a
+ * deterministic mapping of extracted evidence, not a generated description.
+ */
+function completeLineDescriptions(value:unknown):unknown{
+  if(!value||typeof value!=='object'||Array.isArray(value))return value;
+  const document=value as Record<string,unknown>;
+  if(!Array.isArray(document.lineItems))return value;
+  return {...document,lineItems:document.lineItems.map(line=>{
+    if(!line||typeof line!=='object'||Array.isArray(line))return line;
+    const item=line as Record<string,unknown>;
+    const description=typeof item.description==='string'?item.description.trim():'';
+    const itemName=typeof item.itemName==='string'?item.itemName.trim():'';
+    return !description&&itemName?{...item,description:itemName}:line;
+  })};
+}
+
 export class NvidiaVisionProvider implements VisionModelProvider {
   private client:NvidiaClient;
   constructor(private config:NvidiaConfig=nvidiaConfig(),fetcher:typeof fetch=fetch){this.client=new NvidiaClient(config,fetcher)}
@@ -39,7 +58,7 @@ export class NvidiaVisionProvider implements VisionModelProvider {
       if(parsed&&typeof parsed==='object'&&'documentType' in parsed&&parsed.documentType==='NOT_INVOICE'){
         return {extraction:ExtractedInvoiceSchema.parse({documentType:'NOT_INVOICE'}),rawResponse:raw,model:this.config.model,provider:'NVIDIA_NIM',finishReason:choice.finish_reason,usage:response.usage,latencyMs:Date.now()-start};
       }
-      const validated=ExtractedInvoiceSchema.safeParse(parsed);
+      const validated=ExtractedInvoiceSchema.safeParse(completeLineDescriptions(parsed));
       if(!validated.success){lastError=new ExtractionError('EXTRACTION_SCHEMA_INVALID','Model output did not match the invoice schema',raw);continue}
       return {extraction:validated.data,rawResponse:raw,model:this.config.model,provider:'NVIDIA_NIM',finishReason:choice.finish_reason,usage:response.usage,latencyMs:Date.now()-start};
     }
