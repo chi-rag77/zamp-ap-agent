@@ -1,5 +1,33 @@
-import Link from 'next/link';
-import {objectContext,members} from '../../../lib/objects';
+import { objectContext, members } from '../../../lib/objects';
+import { OrganizationProfile, type OrganizationSettings } from './profile';
 import '../../../components/objects/workspace.css';
-export const dynamic='force-dynamic';
-export default async function OrganizationPage(){const c=await objectContext();const [org,people]=await Promise.all([c.db.from('organizations').select('name,status,plan').eq('id',c.organizationId).single(),members(c)]);if(org.error)throw new Error('Organization settings unavailable');return <div className="object-workspace"><section className="ow-card"><h2>{org.data.name}</h2><p>{org.data.status} · {org.data.plan} · Your role: {c.role}</p></section><section className="ow-card"><h3>Members & roles</h3><table className="ow-table"><thead><tr><th>Member</th><th>Role</th></tr></thead><tbody>{people.map(p=><tr key={p.workos_user_id}><td>{p.email}</td><td>{p.role}</td></tr>)}</tbody></table><p>Membership and identity are synchronized from WorkOS.</p></section><section className="ow-card"><h3>Security & identity</h3><dl className="ow-detail-grid"><div><dt>Authentication</dt><dd>WorkOS organization sessions</dd></div><div><dt>Data access</dt><dd>Organization-scoped records and database policies</dd></div><div><dt>SSO</dt><dd>Managed through your WorkOS connection</dd></div><div><dt>SCIM</dt><dd>Requires a configured WorkOS directory connection</dd></div></dl></section><section className="ow-card"><h3>Organization controls</h3><div className="ow-toolbar"><Link className="button" href="/settings/data-model">Data model</Link><Link className="button" href="/rules">Policies</Link><Link className="button" href="/settings/integrations">Integrations</Link><Link className="button" href="/settings/field-mapping">Field mappings</Link><Link className="button" href="/my-work">Notifications</Link><Link className="button" href="/audit">Audit log</Link></div></section></div>}
+
+export const dynamic = 'force-dynamic';
+
+const defaults: OrganizationSettings = {
+  logo_data_url: null,
+  time_zone: 'Asia/Kolkata',
+  date_format: 'DD/MM/YYYY',
+  clock_format: '24-hour',
+  number_locale: 'en-IN',
+  number_format: 'indian',
+  currency: 'INR',
+  language: 'en',
+  decimal_precision: { price: 2, number: 2, percentage: 2 },
+  exchange_source: 'open_exchange_rates',
+  allow_free_text_items: false,
+  email_approvals: false,
+  show_item_specifications: false,
+};
+
+export default async function OrganizationPage() {
+  const context = await objectContext();
+  const [org, people] = await Promise.all([
+    context.db.from('organizations').select('name,status,plan,settings').eq('id', context.organizationId).single(),
+    members(context),
+  ]);
+  if (org.error) throw new Error('Organization settings unavailable');
+  const settings = { ...defaults, ...(org.data.settings as Partial<OrganizationSettings> ?? {}) };
+  settings.decimal_precision = { ...defaults.decimal_precision, ...settings.decimal_precision };
+  return <OrganizationProfile organization={{ name: org.data.name, status: org.data.status, plan: org.data.plan }} role={context.role} members={people} initialSettings={settings} />;
+}

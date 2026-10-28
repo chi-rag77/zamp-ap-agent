@@ -29,6 +29,6 @@ describe('Outbound network boundary',()=>{
 describe('OpenAPI discovery and catalog truthfulness',()=>{
  it('discovers operations without fetching external references',()=>{const imported=parseOpenAPI({openapi:'3.1.0',info:{title:'ERP'},servers:[{url:'https://api.example.com'}],paths:{'/vendors':{get:{},post:{},parameters:[]},'/invoice':{$ref:'http://127.0.0.1/private'}}});expect(imported.operations).toEqual([{path:'/vendors',method:'GET'},{path:'/vendors',method:'POST'}])});
  it('rejects unsupported documents',()=>expect(()=>parseOpenAPI({swagger:'2.0'})).toThrow());
- it('labels nonfunctional providers unavailable',()=>expect(catalog.filter(item=>item.available).map(item=>item.id)).toEqual(['gmail','rest','odata']));
+ it('labels only working integrations as available',()=>expect(catalog.filter(item=>item.available).map(item=>item.id)).toEqual(['gmail','rest']));
  it('has unique provider identities',()=>expect(new Set(catalog.map(item=>item.id)).size).toBe(catalog.length));
 });
