@@ -36,6 +36,10 @@ Set `NVIDIA_API_KEY` in `.env.local` for real mode. The default model in `.env.e
 
 NVIDIA model availability, input limits, and structured-output support depend on the selected model. See the [model survey and live test notes](docs/nvidia-model-selection.md) and the [Nano Omni API reference](https://docs.api.nvidia.com/nim/re/reference/nvidia-nemotron-3-nano-omni-30b-a3b-reasoning-infer) before changing `NVIDIA_MODEL`. The repository does not contain an NVIDIA API key; the ignored local `.env.local` is required for real NIM calls.
 
+## Zamp Copilot MVP
+
+Set `NVIDIA_COPILOT_MODEL=nvidia/nemotron-3.5-bolt-e4b` alongside the server-only `NVIDIA_API_KEY` to enable the read-only Copilot panel. It uses organization-authorized invoice, PO, vendor, and queue-summary tools; the configured extraction model remains independent. Copilot does not make approvals, change records, or decide financial outcomes. Document vision, semantic retrieval, reranking, and deep analytics are later phases and are not advertised as active features. If the Copilot model is not configured or unavailable, only the Copilot panel is unavailable; normal AP processing remains available.
+
 ## Document support
 
 `packages/document` checks the file signature against its MIME type and enforces `MAX_INVOICE_FILE_SIZE_MB=20`. It reads PNG and JPEG with `sharp`, corrects orientation, and keeps full resolution. PDF page counting and rendering use the pinned `pdf-parse`/PDF.js runtime, with `MAX_INVOICE_PAGES=20`, 1240-pixel page width, and deterministic page order; this works in serverless deployments without a system Poppler install. The private `invoice-documents` Supabase Storage bucket accepts PDF, PNG, and JPEG.
