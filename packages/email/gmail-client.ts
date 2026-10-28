@@ -11,6 +11,7 @@ export class GmailClient {
  return response.json() as Promise<T>};return retry?withRetry(attempt):attempt()}
  getProfile(){return this.request<{emailAddress:string;historyId:string}>('/profile')}
  getMessage(id:string){return this.request<GmailMessage>(`/messages/${encodeURIComponent(id)}?format=full`)}
+ getMessageMetadata(id:string){return this.request<GmailMessage>(`/messages/${encodeURIComponent(id)}?format=metadata`)}
  listMessages(query='has:attachment',pageToken?:string,maxResults=100){const qs=new URLSearchParams({q:query,maxResults:String(maxResults)});if(pageToken)qs.set('pageToken',pageToken);return this.request<{messages?:{id:string}[];nextPageToken?:string}>(`/messages?${qs}`)}
  getAttachment(messageId:string,attachmentId:string){return this.request<{size:number;data:string}>(`/messages/${encodeURIComponent(messageId)}/attachments/${encodeURIComponent(attachmentId)}`)}
  listHistory(startHistoryId:string,pageToken?:string){const qs=new URLSearchParams({startHistoryId});qs.append('historyTypes','messageAdded');qs.append('historyTypes','labelAdded');if(pageToken)qs.set('pageToken',pageToken);return this.request<GmailHistory>(`/history?${qs}`)}

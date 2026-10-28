@@ -4,14 +4,17 @@ import {processEmailMessage} from '@zamp/email';
 import {emailAdmin,uuid} from '../../../../../../lib/email-api';
 import {dispatchAgentWorker} from '../../../../../../lib/agent-worker';
 import {tenantCanAccess} from '../../../../../../lib/tenant-database';
+import {intakeBelongsToMailbox} from '../../../../../../lib/email-intake-scope';
+import {gmailMailbox} from '@zamp/email';
 export const runtime='nodejs';export const maxDuration=300;
 export async function POST(request:NextRequest,{params}:{params:Promise<{id:string}>}){
   if(!emailAdmin(request))return NextResponse.json({error:'Unauthorized'},{status:401});
   const {id}=await params;
   if(!uuid(id))return NextResponse.json({error:'Invalid ID'},{status:400});
   if(!await tenantCanAccess('email_intakes',id))return NextResponse.json({error:'Intake not found'},{status:404});
-  const {data,error}=await createServerClient().from('email_intakes').select('provider,message_id,status').eq('id',id).maybeSingle();
+  const {data,error}=await createServerClient().from('email_intakes').select('provider,message_id,status,to_addresses').eq('id',id).maybeSingle();
   if(error||!data)return NextResponse.json({error:'Intake not found'},{status:404});
+  if(!intakeBelongsToMailbox(data.to_addresses,gmailMailbox()))return NextResponse.json({error:'Intake not found'},{status:404});
   if(data.provider!=='GMAIL')return NextResponse.json({error:'Demo messages must be submitted again through the fixture endpoint'},{status:409});
   if(!['FAILED','NEEDS_REVIEW'].includes(data.status))return NextResponse.json({error:'Only failed or review intakes can be reprocessed'},{status:409});
   try{const result=await processEmailMessage(data.message_id);after(async()=>{await dispatchAgentWorker(request.nextUrl.origin)});return NextResponse.json(result)}
