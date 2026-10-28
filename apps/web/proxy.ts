@@ -10,7 +10,7 @@ export default function proxy(request:NextRequest,event:NextFetchEvent){
   if(!workosAuthEnabled()){
     return NextResponse.next();
   }
-  const publicPaths=['/login','/sign-in','/sign-up','/callback','/auth/complete','/organization-setup','/approvals/email','/api/approvals/email','/api/auth/organization','/api/email/cron','/api/email/gmail/callback','/api/email/gmail/webhook','/api/email/watch/renew','/api/agent/worker','/api/webhooks/workos'];
+  const publicPaths=['/login','/sign-in','/sign-up','/callback','/auth/complete','/organization-setup','/approvals/email','/api/approvals/email','/api/auth/organization','/api/email/cron','/api/email/gmail/callback','/api/email/gmail/webhook','/api/email/watch/renew','/api/agent/worker','/api/webhooks/workos','/api/v1/health','/api/v1/purchase-orders'];
   const isPublic=publicPaths.some(path=>request.nextUrl.pathname===path||request.nextUrl.pathname.startsWith(`${path}/`));
   const sessionCookie=request.cookies.get(process.env.WORKOS_COOKIE_NAME||'wos-session');
   if(!sessionCookie&&!isPublic){
