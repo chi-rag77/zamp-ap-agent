@@ -6,16 +6,20 @@ export async function GET(request:NextRequest){
  if(!allowed(request))return denied();
  try{
   const db=await createWebServerClient(),since=new Date(Date.now()-30*86400000).toISOString(),today=new Date();today.setHours(0,0,0,0);const todayIso=today.toISOString();
+  const activeInvoices=await db.from('invoices').select('id').is('archived_at',null);
+  if(activeInvoices.error)throw activeInvoices.error;
+  const invoiceIds=(activeInvoices.data??[]).map(invoice=>invoice.id);
+  if(!invoiceIds.length)return NextResponse.json({processingNow:0,queued:0,needsReview:0,invoicesToday:0,approvedToday:0,rejectedToday:0,reviewToday:0,successRate:0,failureRate:0,averageProcessingTimeMs:null,p95ProcessingTimeMs:null,lastSuccessfulRunAt:null},{headers:{'Cache-Control':'no-store'}});
   const [active,queued,review,invoicesToday,approvedToday,rejectedToday,reviewToday,history,lastSuccess]=await Promise.all([
-   db.from('agent_runs').select('id',{count:'exact',head:true}).in('status',['QUEUED','RUNNING']),
-   db.from('agent_runs').select('id',{count:'exact',head:true}).eq('status','QUEUED'),
-   db.from('review_cases').select('id',{count:'exact',head:true}).in('status',['OPEN','IN_PROGRESS']),
-   db.from('invoices').select('id',{count:'exact',head:true}).gte('received_at',todayIso).is('archived_at',null),
-   db.from('agent_runs').select('id',{count:'exact',head:true}).gte('created_at',todayIso).eq('final_decision','AUTO_APPROVED'),
-   db.from('agent_runs').select('id',{count:'exact',head:true}).gte('created_at',todayIso).eq('final_decision','AUTO_REJECTED'),
-   db.from('agent_runs').select('id',{count:'exact',head:true}).gte('created_at',todayIso).eq('final_decision','NEEDS_REVIEW'),
-   db.from('agent_runs').select('status,duration_ms,created_at,error_class').gte('created_at',since).order('created_at',{ascending:false}).limit(1000),
-   db.from('agent_runs').select('completed_at').eq('status','COMPLETED').order('completed_at',{ascending:false}).limit(1).maybeSingle()
+   db.from('agent_runs').select('id',{count:'exact',head:true}).in('invoice_id',invoiceIds).in('status',['QUEUED','RUNNING']),
+   db.from('agent_runs').select('id',{count:'exact',head:true}).in('invoice_id',invoiceIds).eq('status','QUEUED'),
+   db.from('review_cases').select('id',{count:'exact',head:true}).in('invoice_id',invoiceIds).in('status',['OPEN','IN_PROGRESS']),
+   db.from('invoices').select('id',{count:'exact',head:true}).in('id',invoiceIds).gte('received_at',todayIso),
+   db.from('agent_runs').select('id',{count:'exact',head:true}).in('invoice_id',invoiceIds).gte('created_at',todayIso).eq('final_decision','AUTO_APPROVED'),
+   db.from('agent_runs').select('id',{count:'exact',head:true}).in('invoice_id',invoiceIds).gte('created_at',todayIso).eq('final_decision','AUTO_REJECTED'),
+   db.from('agent_runs').select('id',{count:'exact',head:true}).in('invoice_id',invoiceIds).gte('created_at',todayIso).eq('final_decision','NEEDS_REVIEW'),
+   db.from('agent_runs').select('status,duration_ms,created_at,error_class').in('invoice_id',invoiceIds).gte('created_at',since).order('created_at',{ascending:false}).limit(1000),
+   db.from('agent_runs').select('completed_at').in('invoice_id',invoiceIds).eq('status','COMPLETED').order('completed_at',{ascending:false}).limit(1).maybeSingle()
   ]);
   for(const result of [active,queued,review,invoicesToday,approvedToday,rejectedToday,reviewToday,history,lastSuccess])if(result.error)throw result.error;
   const historyRows=history.data??[],terminal=historyRows.filter(row=>['COMPLETED','FAILED'].includes(row.status)),success=terminal.filter(row=>row.status==='COMPLETED').length,failedCount=terminal.length-success,durations=historyRows.map(row=>row.duration_ms).filter((value):value is number=>typeof value==='number').sort((a,b)=>a-b);
