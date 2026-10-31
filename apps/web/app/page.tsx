@@ -10,6 +10,7 @@ import './dashboard.css';
 
 export const dynamic='force-dynamic';
 const words=(value:string)=>value.replaceAll('_',' ').toLowerCase().replace(/\b\w/g,c=>c.toUpperCase());
+const activityIcon=(value:string)=>{const type=value.toLowerCase();if(/approv|reject|decision/.test(type))return 'check';if(/invoice|extract|document/.test(type))return 'invoice';if(/policy|validat|match/.test(type))return 'shield';if(/integrat|mapping|webhook/.test(type))return 'integrations';return 'agent'};
 const pct=(value:number)=>`${Math.round(value*10)/10}%`;
 function compactDuration(ms:number){if(!ms)return '—';const seconds=Math.round(ms/1000);return seconds>=60?`${Math.floor(seconds/60)}m ${String(seconds%60).padStart(2,'0')}s`:`${seconds}s`}
 function timeAgo(date:string){const diff=Math.max(0,Date.now()-new Date(date).getTime());if(diff<3600000)return `${Math.max(1,Math.round(diff/60000))} min ago`;if(diff<86400000)return `${Math.round(diff/3600000)} hr ago`;return `${Math.round(diff/86400000)} day ago`}
@@ -58,11 +59,11 @@ export default async function Home(){
     ['PO match rate',pct(validations.length?validations.filter(item=>item.result?.purchaseOrder?.status==='MATCHED').length/validations.length*100:0),validations.length?validations.filter(item=>item.result?.purchaseOrder?.status==='MATCHED').length/validations.length*100:0]
   ] as const;
   const limits=[
-    [auto.requiresPo?'A purchase order is required before approval.':'Purchase order exceptions require review.',`Policy v${policyResult.data?.version??'—'} · blocking`],
-    [`Price variance above ${auto.maxPriceVariancePercent??'—'}% requires review.`,`Policy v${policyResult.data?.version??'—'} · tolerance`],
-    [`Extraction confidence below ${Number(auto.minExtractionConfidence??0)*100}% stops automatic approval.`,`Policy v${policyResult.data?.version??'—'} · confidence`],
-    [config.rejection?.confirmedDuplicate?'Confirmed duplicate invoices are rejected.':'Duplicate invoices require a recorded review.','Duplicate control'],
-    ['Every policy evaluation records its version and evidence.','Audit trail']
+    [auto.requiresPo?'A purchase order is required before approval.':'Purchase order exceptions require review.',`Policy v${policyResult.data?.version??'—'} · blocking`,'po'],
+    [`Price variance above ${auto.maxPriceVariancePercent??'—'}% requires review.`,`Policy v${policyResult.data?.version??'—'} · tolerance`,'invoice'],
+    [`Extraction confidence below ${Number(auto.minExtractionConfidence??0)*100}% stops automatic approval.`,`Policy v${policyResult.data?.version??'—'} · confidence`,'agent'],
+    [config.rejection?.confirmedDuplicate?'Confirmed duplicate invoices are rejected.':'Duplicate invoices require a recorded review.','Duplicate control','invoice'],
+    ['Every policy evaluation records its version and evidence.','Audit trail','audit']
   ];
   const csv=['invoice_number,vendor,status,amount,currency',...invoices.map(invoice=>[invoice.invoice_number??'',vendorName(w,invoice),invoiceDisplayStatus(w,invoice),invoice.total??'',invoice.currency].map(value=>`"${String(value).replaceAll('"','""')}"`).join(','))].join('\n');
   return <div className="ap-dashboard"><header className="ap-page-head"><h1>Accounts Payable</h1><p>Your agent owns intake, matching and every decision. This is what it handled alone — and what it needs from you.</p><div className="ap-toolbar"><span className="ap-online" title="Agent health is checked after the page loads"><span className="online-dot"/> Agent status in sidebar</span><button className="ap-toolbar-button" type="button" title="Showing the last 30 days">▦ &nbsp;Last 30 days</button><a className="ap-toolbar-button" download="zamp-invoices.csv" href={`data:text/csv;charset=utf-8,${encodeURIComponent(csv)}`}><Icon name="download" size={15}/> Export</a><button className="ap-toolbar-button" disabled title="Agent pause is not configured in this workspace"><span>Ⅱ</span> Pause agent</button><UploadButton/></div></header><LocalNotice enabled={w.enabled}/><DashboardLiveMetrics/>
@@ -73,8 +74,8 @@ export default async function Home(){
       <section className="ap-card ap-performance"><div className="ap-card-head"><div><h2>Agent performance</h2><p>Last 30 days</p></div><span className="ap-live-badge">LIVE DATA</span></div><div className="ap-performance-list">{performance.map(([name,value,rate])=><div className="ap-performance-row" key={name}><div><span>{name}</span><strong>{value}</strong></div>{rate!==null&&<div className="ap-performance-track" role="meter" aria-label={name} aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(rate)}><span style={{width:barRate(rate)}}/></div>}</div>)}</div></section>
     </div>
     <div className="ap-activity-grid">
-      <section className="ap-card ap-activity"><div className="ap-card-head"><div><h2>Recent agent activity</h2><p>Autonomous actions recorded for available invoices</p></div><Link href="/audit">Audit log <Icon name="arrow" size={13}/></Link></div>{audits.length?<ol>{audits.slice(0,8).map(event=><li key={event.id}><time dateTime={event.created_at}>{new Intl.DateTimeFormat('en-IN',{hour:'2-digit',minute:'2-digit',hour12:true}).format(new Date(event.created_at))}</time><span className="ap-activity-dot"/><div><strong>{event.description}</strong><small>{words(event.event_type)}</small></div></li>)}</ol>:<Empty title="No activity yet" message="Recorded agent actions will appear here."/>}</section>
-      <section className="ap-card ap-limits"><div className="ap-card-head"><div><h2>Hard limits</h2><p>What the agent will never do without you</p></div></div><ul>{limits.map(([title,detail])=><li key={title}><Icon name="lock" size={17}/><div>{title}<small>{detail}</small></div></li>)}</ul><Link className="ap-limits-link" href="/rules">Edit the policy it obeys <Icon name="arrow" size={13}/></Link></section>
+      <section className="ap-card ap-activity"><div className="ap-card-head"><div><h2>Recent agent activity</h2><p>Autonomous actions recorded for available invoices</p></div><Link href="/audit">Audit log <Icon name="arrow" size={13}/></Link></div>{audits.length?<ol>{audits.slice(0,6).map(event=><li key={event.id}><time dateTime={event.created_at}>{new Intl.DateTimeFormat('en-IN',{hour:'2-digit',minute:'2-digit',hour12:true}).format(new Date(event.created_at))}</time><span className="ap-activity-icon"><Icon name={activityIcon(event.event_type)} size={13}/></span><div><strong>{event.description}</strong><small>{words(event.event_type)}</small></div></li>)}</ol>:<Empty title="No activity yet" message="Recorded agent actions will appear here."/>}</section>
+      <section className="ap-card ap-limits"><div className="ap-card-head"><div><h2>Hard limits</h2><p>What the agent will never do without you</p></div></div><ul>{limits.map(([title,detail,icon])=><li key={title}><span className="ap-limit-icon"><Icon name={icon} size={14}/></span><div>{title}<small>{detail}</small></div></li>)}</ul><Link className="ap-limits-link" href="/rules">Edit the policy it obeys <Icon name="arrow" size={13}/></Link></section>
     </div>
   </div>;
 }
