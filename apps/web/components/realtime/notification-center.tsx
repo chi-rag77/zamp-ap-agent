@@ -1,5 +1,5 @@
 'use client';
-import {useCallback,useEffect,useMemo,useState} from 'react';
+import {useCallback,useEffect,useMemo,useRef,useState} from 'react';
 import Link from 'next/link';
 
 type Notification={id:string;type:string;title:string;message:string;invoice_id:string|null;run_id:string|null;read_at:string|null;created_at:string;workspace?:boolean;object_type?:string;object_id?:string};
@@ -12,9 +12,13 @@ function groupName(value:string){const d=new Date(value);if(!Number.isFinite(d.g
 function linkFor(item:Notification){if(item.workspace&&item.object_type&&item.object_id)return `/objects/${item.object_type}/${item.object_id}`;if(item.invoice_id)return `/invoices/${item.invoice_id}`;if(item.run_id)return `/agent/runs/${item.run_id}`;return null}
 
 export function NotificationCenter(){
-  const [items,setItems]=useState<Notification[]>([]);const [open,setOpen]=useState(false);const [busy,setBusy]=useState(false);const [filter,setFilter]=useState<Filter>('all');const [error,setError]=useState('');
-  const load=useCallback(async()=>{try{const [legacy,workspace]=await Promise.all([fetch('/api/notifications',{cache:'no-store'}),fetch('/api/workspace/notifications',{cache:'no-store'})]);const first=legacy.ok?(await legacy.json()).notifications??[]:[];const second=workspace.ok?((await workspace.json()).notifications??[]).map((n:Notification)=>({...n,workspace:true})):[];setItems([...first,...second].sort((a,b)=>Date.parse(b.created_at)-Date.parse(a.created_at)).slice(0,60));setError('')}catch{setError('Notifications could not be refreshed. Try again.')}},[]);
-  useEffect(()=>{void load();const onEvents=(event:Event)=>{const events=(event as CustomEvent<Array<{type:string}>>).detail;if(events?.some(item=>['INVOICE_CREATED','REVIEW_REQUIRED','DECISION_GENERATED','RUN_COMPLETED','RUN_FAILED','ACTION_FAILED','ACTION_VERIFICATION_FAILED'].includes(item.type)))void load()};window.addEventListener('zamp:processing-events',onEvents);window.addEventListener('zamp:workspace-updated',load);const timer=setInterval(()=>{if(document.visibilityState==='visible')void load()},30000);return()=>{window.removeEventListener('zamp:processing-events',onEvents);window.removeEventListener('zamp:workspace-updated',load);clearInterval(timer)}},[load]);
+  const [items,setItems]=useState<Notification[]>([]);const [open,setOpen]=useState(false);const [busy,setBusy]=useState(false);const [filter,setFilter]=useState<Filter>('all');const [error,setError]=useState('');const inFlight=useRef<Promise<void>|null>(null);
+  const load=useCallback(()=>{
+    if(inFlight.current)return inFlight.current;
+    const request=(async()=>{try{const [legacy,workspace]=await Promise.all([fetch('/api/notifications',{cache:'no-store'}),fetch('/api/workspace/notifications',{cache:'no-store'})]);const first=legacy.ok?(await legacy.json()).notifications??[]:[];const second=workspace.ok?((await workspace.json()).notifications??[]).map((n:Notification)=>({...n,workspace:true})):[];setItems([...first,...second].sort((a,b)=>Date.parse(b.created_at)-Date.parse(a.created_at)).slice(0,60));setError('')}catch{setError('Notifications could not be refreshed. Try again.')}})();
+    inFlight.current=request;void request.finally(()=>{if(inFlight.current===request)inFlight.current=null});return request;
+  },[]);
+  useEffect(()=>{let eventTimer:ReturnType<typeof setTimeout>|undefined;void load();const onEvents=(event:Event)=>{const events=(event as CustomEvent<Array<{type:string}>>).detail;if(events?.some(item=>['INVOICE_CREATED','REVIEW_REQUIRED','DECISION_GENERATED','RUN_COMPLETED','RUN_FAILED','ACTION_FAILED','ACTION_VERIFICATION_FAILED'].includes(item.type))){if(eventTimer)clearTimeout(eventTimer);eventTimer=setTimeout(()=>void load(),350)}};const resume=()=>{if(document.visibilityState==='visible')void load()};window.addEventListener('zamp:processing-events',onEvents);window.addEventListener('zamp:workspace-updated',load);document.addEventListener('visibilitychange',resume);const timer=setInterval(()=>{if(document.visibilityState==='visible')void load()},120000);return()=>{if(eventTimer)clearTimeout(eventTimer);window.removeEventListener('zamp:processing-events',onEvents);window.removeEventListener('zamp:workspace-updated',load);document.removeEventListener('visibilitychange',resume);clearInterval(timer)}},[load]);
   const unread=items.filter(item=>!item.read_at).length;
   const visible=useMemo(()=>filter==='unread'?items.filter(item=>!item.read_at):items,[filter,items]);
   const groups=useMemo(()=>visible.reduce<Record<string,Notification[]>>((acc,item)=>{const group=groupName(item.created_at);(acc[group]??=[]).push(item);return acc},{}),[visible]);
