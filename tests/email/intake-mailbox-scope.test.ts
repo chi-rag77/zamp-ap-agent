@@ -14,13 +14,14 @@ describe('mailbox-scoped email intake', () => {
     expect(intakeBelongsToMailbox(null, 'ocrzamp.ap01@gmail.com')).toBe(false);
   });
 
-  it('paginates recipient metadata and returns only matching IDs', async () => {
-    const range = vi.fn().mockResolvedValueOnce({ data: [
-      { id: 'personal', to_addresses: ['chiragshetty8088@gmail.com'] },
-      { id: 'configured', to_addresses: ['Zamp AP <ocrzamp.ap01@gmail.com>'] },
-    ], error: null });
-    const db = { from: vi.fn(() => ({ select: vi.fn(() => ({ order: vi.fn(() => ({ range })) })) })) };
-    await expect(mailboxIntakeIds(db, 'ocrzamp.ap01@gmail.com', 10)).resolves.toEqual(['configured']);
-    expect(range).toHaveBeenCalledWith(0, 499);
+  it('filters recipients in the database and applies a bounded result limit', async () => {
+    const limit = vi.fn().mockResolvedValueOnce({ data: [{ id: 'configured' }], error: null });
+    const order = vi.fn(() => ({ limit }));
+    const contains = vi.fn(() => ({ order }));
+    const select = vi.fn(() => ({ contains }));
+    const db = { from: vi.fn(() => ({ select })) };
+    await expect(mailboxIntakeIds(db as never, 'ocrzamp.ap01@gmail.com', 10)).resolves.toEqual(['configured']);
+    expect(contains).toHaveBeenCalledWith('to_addresses', ['ocrzamp.ap01@gmail.com']);
+    expect(limit).toHaveBeenCalledWith(10);
   });
 });

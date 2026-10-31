@@ -3,10 +3,10 @@ import type {GmailClient} from '../../packages/email/gmail-client';
 import {EmailError} from '../../packages/email/errors';
 
 const state=vi.hoisted(()=>({
- row:{last_history_id:'100',status:'HEALTHY',full_sync_page_token:null} as Record<string,unknown>,
+ row:{last_history_id:'100',status:'HEALTHY',full_sync_page_token:null,history_page_token:null,history_target_id:null} as Record<string,unknown>,
  writes:[] as Record<string,unknown>[],
  known:[] as string[],
- reset(){this.known=[];this.row={last_history_id:'100',status:'HEALTHY',full_sync_page_token:null};this.writes=[];},
+ reset(){this.known=[];this.row={last_history_id:'100',status:'HEALTHY',full_sync_page_token:null,history_page_token:null,history_target_id:null};this.writes=[];},
 }));
 
 vi.mock('@zamp/database',()=>({createServerClient:()=>({from:()=>({
@@ -93,6 +93,25 @@ describe('Gmail history synchronization',()=>{
   expect(calls).toEqual([{page:undefined,size:25},{page:'page-2',size:25}]);
   expect(processed).toEqual(['m1','m2']);
   expect(state.row).toMatchObject({last_history_id:'250',status:'HEALTHY',full_sync_page_token:null});
+ });
+
+ it('limits history work per invocation and resumes from a persisted page token',async()=>{
+  vi.stubEnv('GMAIL_INVOICE_MAILBOX','ap@example.com');
+  const calls:(string|undefined)[]=[];
+  const client={
+   getProfile:async()=>({emailAddress:'ap@example.com',historyId:'250'}),
+   listHistory:async(_cursor:string,page?:string)=>{calls.push(page);const number=page?Number(page.replace('page-',''))+1:1;return {historyId:'250',history:[{id:String(150+number),labelsAdded:[{message:{id:`m${number}`},labelIds:['INBOX']}]}],nextPageToken:number<7?`page-${number}`:undefined}},
+   listMessages:async()=>({messages:[]}),
+  } as unknown as GmailClient;
+  const processed:string[]=[];const process=async(id:string)=>{processed.push(id);return {status:'PROCESSED'} as never;};
+  const first=await syncGmailMailbox(client,process);
+  expect(first).toMatchObject({hasMore:true,historyId:'100',processed:5});
+  expect(state.row).toMatchObject({last_history_id:'100',history_page_token:'page-5',history_target_id:'250',status:'SYNCING'});
+  const second=await syncGmailMailbox(client,process);
+  expect(second).toMatchObject({hasMore:false,historyId:'250',processed:2});
+  expect(calls).toEqual([undefined,'page-1','page-2','page-3','page-4','page-5','page-6']);
+  expect(processed).toEqual(['m1','m2','m3','m4','m5','m6','m7']);
+  expect(state.row).toMatchObject({last_history_id:'250',history_page_token:null,history_target_id:null,status:'HEALTHY'});
  });
 
  it('advances the full-sync page token after recording a failed message',async()=>{
