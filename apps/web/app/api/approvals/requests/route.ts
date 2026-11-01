@@ -1,3 +1,4 @@
+import {hasTrustedOrigin} from '../../../../lib/request-origin';
 import {NextRequest,NextResponse} from 'next/server';
 import {z} from 'zod';
 import {approvalRules,evaluateApprovalRules,type ApprovalInput} from '../../../../../../packages/approval/index';
@@ -40,7 +41,7 @@ export async function GET(){
 const startSchema=z.object({invoiceId:idSchema}).strict();
 export async function POST(request:NextRequest){
  try{
-  if(request.headers.get('origin')!==request.nextUrl.origin)throw new WorkspaceError('Request origin is not allowed.',403);
+  if(!hasTrustedOrigin(request))throw new WorkspaceError('Request origin is not allowed.',403);
   const c=await objectContext();await requirePermission(c,'invoices.edit');
   const {invoiceId}=startSchema.parse(await request.json());
   const invoice=await c.db.from('invoices').select('id,invoice_number,total,currency,vendor_id,po_id,status,updated_at,extraction_confidence').eq('organization_id',c.organizationId).eq('id',invoiceId).single();

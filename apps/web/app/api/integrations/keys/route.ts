@@ -1,3 +1,4 @@
+import {hasTrustedOrigin} from '../../../../lib/request-origin';
 import {NextRequest,NextResponse} from 'next/server';
 import {z} from 'zod';
 import {createServerClient} from '@zamp/database';
@@ -48,7 +49,7 @@ export async function GET(){
 
 export async function POST(request:NextRequest){
  try{
-  if(request.headers.get('origin')!==request.nextUrl.origin)throw new WorkspaceError('Request origin is not allowed.',403);
+  if(!hasTrustedOrigin(request))throw new WorkspaceError('Request origin is not allowed.',403);
   const context=await objectContext();requireAdmin(context);
   const body=createSchema.parse(await request.json());
   const {key,prefix,hash}=createIntegrationApiKey();

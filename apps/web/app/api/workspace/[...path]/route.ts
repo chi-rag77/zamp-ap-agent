@@ -1,3 +1,4 @@
+import {hasTrustedOrigin} from '../../../../lib/request-origin';
 import {NextRequest,NextResponse} from 'next/server';
 import {z} from 'zod';
 import {objectContext,objectRecord,objectDetail,activeSchema,members,ensureMembers,requireAdmin,requireWriter,WorkspaceError,type ObjectContext} from '../../../../lib/objects';
@@ -11,7 +12,7 @@ const uuid=z.string().uuid();
 const documentBody=z.object({schemaId:uuid,revision:z.number().int().min(0),values:z.record(z.string(),z.unknown()),lines:z.record(z.string(),z.record(z.string(),z.unknown()))}).strict();
 async function json(request:NextRequest){const text=await request.text();if(text.length>250000)throw new WorkspaceError('Request exceeds 250 KB.',413);try{return JSON.parse(text)}catch{throw new WorkspaceError('Invalid JSON')}}
 async function run(request:NextRequest,paths:string[]){
- const write=request.method!=='GET';if(write&&request.headers.get('origin')!==request.nextUrl.origin)throw new WorkspaceError('Request origin is not allowed.',403);
+ const write=request.method!=='GET';if(write&&!hasTrustedOrigin(request))throw new WorkspaceError('Request origin is not allowed.',403);
  const c=await objectContext();if(write)requireWriter(c);
  const [area,typeOrId,id,action]=paths;
  if(area==='members')return {members:await members(c),userId:c.userId,role:c.role};

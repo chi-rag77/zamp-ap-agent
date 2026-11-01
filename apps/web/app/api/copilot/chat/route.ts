@@ -1,3 +1,4 @@
+import {hasTrustedOrigin} from '../../../../lib/request-origin';
 import {NextRequest,NextResponse} from 'next/server';
 import {z} from 'zod';
 import {objectContext,WorkspaceError} from '../../../../lib/objects';
@@ -56,7 +57,7 @@ async function executeTool(name:string,args:unknown,c:Awaited<ReturnType<typeof 
 
 export async function POST(request:NextRequest){
  try{
-  if(request.headers.get('origin')!==request.nextUrl.origin)throw new WorkspaceError('Request origin is not allowed.',403);
+  if(!hasTrustedOrigin(request))throw new WorkspaceError('Request origin is not allowed.',403);
   const c=await objectContext();await requirePermission(c,'invoices.view');const input=inputSchema.parse(await request.json());
   const apiKey=process.env.NVIDIA_API_KEY;const model=process.env.NVIDIA_COPILOT_MODEL;const base=(process.env.NVIDIA_BASE_URL??'https://integrate.api.nvidia.com/v1').replace(/\/$/,'');
   if(!apiKey||!model)return NextResponse.json({error:'Copilot is not configured yet. Invoice processing and approvals are still available.'},{status:503});

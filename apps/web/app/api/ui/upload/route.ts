@@ -1,3 +1,4 @@
+import {hasTrustedOrigin} from '../../../../lib/request-origin';
 import {NextRequest,NextResponse} from 'next/server';
 import {createHash} from 'node:crypto';
 import {createServerClient} from '@zamp/database';
@@ -11,7 +12,7 @@ import {workosAuthEnabled} from '../../../../lib/workos-auth';
 export const runtime='nodejs';
 export const maxDuration=300;
 export async function POST(request:NextRequest){
-  if(!localWorkspace()||request.headers.get('origin')!==request.nextUrl.origin)return NextResponse.json({error:'This upload is unavailable outside the connected workspace.'},{status:403});
+  if(!localWorkspace()||!hasTrustedOrigin(request))return NextResponse.json({error:'This upload is unavailable outside the connected workspace.'},{status:403});
   let invoiceId:string|undefined;
   try{
     const file=(await request.formData()).get('file');

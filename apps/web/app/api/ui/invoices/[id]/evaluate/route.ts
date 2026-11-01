@@ -1,11 +1,11 @@
+import {hasTrustedOrigin} from '../../../../../../lib/request-origin';
 import {NextRequest,NextResponse} from 'next/server';
 import {evaluateSavedInvoice} from '@zamp/policy';
 import {localWorkspace} from '../../../../../../lib/data';
 import {tenantCanAccess} from '../../../../../../lib/tenant-database';
 export const runtime='nodejs';
 export async function POST(request:NextRequest,{params}:{params:Promise<{id:string}>}){
-  const origin=request.headers.get('origin');
-  if(!localWorkspace()||origin!==request.nextUrl.origin)return NextResponse.json({error:'Unavailable outside the local workspace'},{status:403});
+  if(!localWorkspace()||!hasTrustedOrigin(request))return NextResponse.json({error:'Unavailable outside the local workspace'},{status:403});
   const {id:rawId}=await params;
   let id=rawId;
   try{id=decodeURIComponent(rawId).trim().replace(/^\{(.+)\}$/,'$1')}catch{return NextResponse.json({error:'Invoice ID is not valid.'},{status:400})}

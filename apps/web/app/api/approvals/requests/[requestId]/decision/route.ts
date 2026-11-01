@@ -1,3 +1,4 @@
+import {hasTrustedOrigin} from '../../../../../../lib/request-origin';
 import {NextRequest,NextResponse} from 'next/server';
 import {z} from 'zod';
 import {objectContext,WorkspaceError} from '../../../../../../lib/objects';
@@ -7,7 +8,7 @@ export const runtime='nodejs';export const dynamic='force-dynamic';
 const bodySchema=z.object({decision:z.enum(['APPROVE','REJECT','REQUEST_CORRECTION']),reason:z.string().trim().max(2000).default(''),expectedInvoiceUpdatedAt:z.iso.datetime({offset:true})}).strict();
 export async function POST(request:NextRequest,{params}:{params:Promise<{requestId:string}>}){
  try{
-  if(request.headers.get('origin')!==request.nextUrl.origin)throw new WorkspaceError('Request origin is not allowed.',403);
+  if(!hasTrustedOrigin(request))throw new WorkspaceError('Request origin is not allowed.',403);
   const c=await objectContext();const {requestId}=await params;z.string().uuid().parse(requestId);const input=bodySchema.parse(await request.json());
   await requirePermission(c,input.decision==='APPROVE'?'invoices.approve':'invoices.reject');
   const current=await c.db.from('approval_requests').select('current_step').eq('organization_id',c.organizationId).eq('id',requestId).maybeSingle();if(current.error)throw current.error;
