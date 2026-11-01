@@ -1,6 +1,8 @@
 import type {ReactNode} from 'react';
 
-export type CopilotVisualization={type:'invoice_processing';period:'all_time';total:number;aiProcessed:number;humanProcessed:number;awaitingDecision:number};
+export type CopilotVisualization=
+ |{type:'invoice_processing';period:'all_time';total:number;aiProcessed:number;humanProcessed:number;awaitingDecision:number}
+ |{type:'invoice_intake';periodDays:number;total:number;points:{label:string;count:number}[]};
 
 function inlineMarkdown(text:string):ReactNode[]{
  const tokens=text.split(/(\*\*[^*]+\*\*|__[^_]+__|`[^`]+`|\*[^*]+\*|_[^_]+_)/g).filter(Boolean);
@@ -41,6 +43,13 @@ export function CopilotAnswer({content,visualization}:{content:string;visualizat
 }
 
 function PerformanceChart({data}:{data:CopilotVisualization}){
+ if(data.type==='invoice_intake'){
+  const max=Math.max(1,...data.points.map(point=>point.count));
+  return <section className="copilot-performance" aria-label={`Invoice arrivals over the last ${data.periodDays} days`}>
+   <div className="copilot-performance-head"><div><strong>Invoices received</strong><small>Last {data.periodDays} days · {data.total.toLocaleString()} total</small></div><span>ACTUAL DATA</span></div>
+   <div className="copilot-intake-bars" role="img" aria-label={data.points.map(point=>`${point.label}: ${point.count} invoices`).join('; ')}>{data.points.map((point,index)=><div className="copilot-intake-bar-column" key={`${point.label}-${index}`}><strong>{point.count}</strong><i style={{height:`${Math.max(4,point.count/max*68)}px`}}/><small>{point.label}</small></div>)}</div>
+  </section>;
+ }
  const categories=[
   {label:'AI processed',value:data.aiProcessed,className:'ai'},
   {label:'Human decided',value:data.humanProcessed,className:'human'},

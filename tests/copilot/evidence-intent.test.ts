@@ -1,5 +1,5 @@
 import {describe,expect,it} from 'vitest';
-import {isAgentPerformanceQuestion,requiresWorkspaceEvidence} from '../../apps/web/lib/copilot-model-router';
+import {invoiceIntakePeriodDays,isAgentPerformanceQuestion,requiresWorkspaceEvidence} from '../../apps/web/lib/copilot-model-router';
 
 describe('Copilot workspace evidence intent',()=>{
   it('allows general AP workflow explanations without record lookups',()=>{
@@ -24,5 +24,14 @@ describe('Copilot workspace evidence intent',()=>{
       expect(isAgentPerformanceQuestion(question)).toBe(true);
       expect(requiresWorkspaceEvidence(question)).toBe(true);
     }
+  });
+
+  it('recognizes invoice intake volumes and their requested time window',()=>{
+    expect(invoiceIntakePeriodDays('How many invoices came in 7 days?')).toBe(7);
+    expect(invoiceIntakePeriodDays('How many invoices arrived over the last 2 weeks?')).toBe(14);
+    expect(invoiceIntakePeriodDays('Count invoices in the last 30 days')).toBe(30);
+    expect(invoiceIntakePeriodDays('How many invoices came in last week?')).toBe(7);
+    expect(invoiceIntakePeriodDays('Explain what an invoice is')).toBeNull();
+    expect(requiresWorkspaceEvidence('How many invoices came in 7 days?')).toBe(true);
   });
 });
