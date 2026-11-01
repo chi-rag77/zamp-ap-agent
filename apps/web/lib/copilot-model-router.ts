@@ -6,6 +6,10 @@ export type CopilotModelConfig = {
   document?: string;
 };
 
+export function isAgentPerformanceQuestion(question: string): boolean {
+  return /\b(agent performance|agent performing|ai versus humans?|ai vs\.? humans?|human versus ai|processed by (?:ai|humans?)|how is (?:the )?(?:ai|agent|copilot) doing)\b/i.test(question);
+}
+
 /**
  * Distinguish questions about AP concepts from requests for facts in the
  * current workspace. The model is allowed to explain general concepts; only
@@ -14,6 +18,7 @@ export type CopilotModelConfig = {
 export function requiresWorkspaceEvidence(question: string, hasPageContext = false): boolean {
   if (hasPageContext && /\b(this|that|these|those|here|it)\b/i.test(question)) return true;
   return /\b(my|our|current|latest|recent|find|search|look up|show|list|compare|how many|count|status of|amount of|history of)\b/i.test(question)
+    || isAgentPerformanceQuestion(question)
     || /\b(?:invoice|inv|po|purchase order)\s*(?:number\s*)?(?:#?\s*)?(?=[A-Z0-9/-]*\d)[A-Z0-9][A-Z0-9/-]{3,}\b/i.test(question)
     || /\b[0-9a-f]{8}-[0-9a-f-]{27,}\b/i.test(question);
 }
