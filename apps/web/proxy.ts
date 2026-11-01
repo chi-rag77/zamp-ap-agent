@@ -1,6 +1,6 @@
 import {authkitProxy} from '@workos-inc/authkit-nextjs';
 import {NextResponse, type NextFetchEvent, type NextRequest} from 'next/server';
-import {workosAuthConfigured,workosAuthEnabled} from './lib/workos-auth';
+import {workosAuthConfigured,workosAuthEnabled,workosRedirectUri} from './lib/workos-auth';
 import {unauthenticatedPaths} from './lib/public-routes';
 
 export default function proxy(request:NextRequest,event:NextFetchEvent){
@@ -19,7 +19,7 @@ export default function proxy(request:NextRequest,event:NextFetchEvent){
     loginUrl.searchParams.set('returnTo',`${request.nextUrl.pathname}${request.nextUrl.search}`);
     return NextResponse.redirect(loginUrl);
   }
-  return authkitProxy({middlewareAuth:{enabled:true,unauthenticatedPaths}})(request,event);
+  return authkitProxy({redirectUri:workosRedirectUri(),middlewareAuth:{enabled:true,unauthenticatedPaths}})(request,event);
 }
 
 export const config={matcher:['/((?!_next/static|_next/image|favicon.ico|icon.svg|robots.txt|sitemap.xml).*)']};

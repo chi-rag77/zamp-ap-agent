@@ -1,6 +1,6 @@
 import {getSignInUrl,getWorkOS} from '@workos-inc/authkit-nextjs';
 import {NextRequest,NextResponse} from 'next/server';
-import {workosAuthEnabled} from '../../lib/workos-auth';
+import {workosAuthEnabled,workosRedirectUri} from '../../lib/workos-auth';
 
 function safeReturnTo(value:string|null){return value?.startsWith('/')&&!value.startsWith('//')&&!value.includes('\\')?value:'/'}
 function completionPath(returnTo:string){return `/auth/complete?returnTo=${encodeURIComponent(returnTo)}`}
@@ -27,5 +27,7 @@ export async function GET(request:NextRequest){
     }
   }
   const returnTo=safeReturnTo(request.nextUrl.searchParams.get('returnTo'));
-  return NextResponse.redirect(await getSignInUrl({...(organizationId?{organizationId}:{}),returnTo:completionPath(returnTo),...(email?{loginHint:email}:{})}));
+  const redirectUri=workosRedirectUri();
+  if(!redirectUri)return NextResponse.redirect(new URL('/login?error=configuration',request.url));
+  return NextResponse.redirect(await getSignInUrl({redirectUri,...(organizationId?{organizationId}:{}),returnTo:completionPath(returnTo),...(email?{loginHint:email}:{})}));
 }
