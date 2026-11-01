@@ -90,7 +90,9 @@ export async function POST(request:NextRequest){
    p_organization_id:auth.organization_id,
    p_api_key_id:auth.id,
    p_purchase_order:{po_number:po.po_number,vendor_id:po.vendor_id,currency:po.currency,po_date:po.po_date,valid_until:po.valid_until??null,subtotal:po.subtotal,tax:po.tax,total:po.total},
-   p_lines:po.lines,
+   // The public API accepts tax_rate as a percentage (for example, 18),
+   // while purchase_order_lines stores it as a fraction (0.18).
+   p_lines:po.lines.map(line=>({...line,tax_rate:line.tax_rate==null?null:line.tax_rate/100})),
   });
   if(error){
    if(error.code==='23505')return respond(409,{error:'A purchase order with this number already exists in the organization.'});
