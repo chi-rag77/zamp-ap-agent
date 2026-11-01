@@ -13,10 +13,10 @@ const bodySchema=z.object({
   expectedUpdatedAt:z.string().datetime({offset:true}),
 }).strict();
 
-export async function POST(request:NextRequest,{params}:{params:Promise<{invoiceId:string}>}){
+export async function POST(request:NextRequest,{params}:{params:Promise<{id:string}>}){
   try{
     if(!hasTrustedOrigin(request))throw new WorkspaceError('Request origin is not allowed.',403);
-    const {invoiceId}=await params;
+    const {id:invoiceId}=await params;
     if(!z.string().uuid().safeParse(invoiceId).success)throw new WorkspaceError('Invalid invoice ID.',400);
     const input=bodySchema.parse(await request.json());
     if(input.decision==='REJECT'&&input.reason.length<3)throw new WorkspaceError('Add a short reason before rejecting this invoice.',400);
