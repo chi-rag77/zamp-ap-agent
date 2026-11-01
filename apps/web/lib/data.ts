@@ -3,9 +3,8 @@ import {createWebServerClient} from './tenant-database';
 import {workosAuthEnabled} from './workos-auth';
 import type {InvoiceValidationResult} from '@zamp/matching';
 
-const vercelWorkspaceEnabled=()=>process.env.VERCEL==='1'&&['preview','production'].includes(process.env.VERCEL_ENV??'')&&process.env.ZAMP_ENABLE_PROTECTED_WORKSPACE==='true';
-/** Production data is available behind Vercel's deployment protection or verified WorkOS auth. */
-export const protectedWorkspaceEnabled=()=>vercelWorkspaceEnabled()||workosAuthEnabled();
+/** Production data is available only to a verified WorkOS organization session. */
+export const protectedWorkspaceEnabled=()=>workosAuthEnabled();
 export const localWorkspace=()=>process.env.NODE_ENV!=='production'||protectedWorkspaceEnabled();
 export type InvoiceRow={id:string;invoice_number:string|null;vendor_id:string|null;po_id:string|null;invoice_date:string|null;due_date:string|null;currency:string;subtotal:string|null;tax:string|null;total:string|null;extraction_confidence:string|null;status:string;decision:string|null;source:string;received_at:string;current_extraction_id:string|null;document_path:string|null;updated_at:string;organization_id?:string|null;bill_to?:Record<string,unknown>|null;ship_to?:Record<string,unknown>|null};
 export type VendorRow={id:string;vendor_code:string;legal_name:string;display_name:string;gstin:string|null;currency:string;status:string};
