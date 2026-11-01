@@ -59,6 +59,8 @@ services:
         sync: false
       - key: EMAIL_CRON_TOKEN
         sync: false
+      - key: EMAIL_CRON_OIDC_AUDIENCE
+        value: https://zamp-ap-agent.onrender.com
       - key: NVIDIA_MODEL
         sync: false
       - key: NVIDIA_COPILOT_MODEL
