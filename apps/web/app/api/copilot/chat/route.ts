@@ -3,7 +3,7 @@ import {NextRequest,NextResponse} from 'next/server';
 import {z} from 'zod';
 import {objectContext,WorkspaceError} from '../../../../lib/objects';
 import {requirePermission} from '../../../../lib/access-control';
-import {resolveCopilotModel} from '../../../../lib/copilot-model-router';
+import {requiresWorkspaceEvidence,resolveCopilotModel} from '../../../../lib/copilot-model-router';
 import {prepareDocument} from '../../../../../../packages/document/src/index';
 
 export const runtime='nodejs';
@@ -26,7 +26,6 @@ const toolSpecs=[
 type ToolCall={id:string;type:'function';function:{name:string;arguments:string}};
 type Message={role:'system'|'user'|'assistant'|'tool';content:string|({type:'text';text:string}|{type:'image_url';image_url:{url:string}})[]|null;tool_calls?:ToolCall[];tool_call_id?:string};
 const uuid=z.string().uuid();
-const recordQuestion=/\b(invoice|invoices|purchase order|\bpo\b|vendor|approval|approver|reject(?:ed|ion)?|exception|matching|queue|amount|payable|tax|policy|decision|review|paid|audit|processing|trend|spend)\b/i;
 type CopilotContext=Awaited<ReturnType<typeof objectContext>>&{pageContext?:{type:'invoice'|'purchase_order'|'vendor';id:string}};
 
 async function executeTool(name:string,args:unknown,c:CopilotContext){
@@ -118,7 +117,7 @@ export async function POST(request:NextRequest){
    if((!response||!response.ok)&&model!==standardModel){console.warn('Specialized Copilot model unavailable; using the configured default',{route:selected.route,status:response?.status??'timeout'});model=standardModel;for(const item of messages){if(Array.isArray(item.content)){const textOnly=item.content.filter(part=>part.type==='text');item.content=textOnly.length?textOnly:[{type:'text',text:'The specialized model was unavailable. Answer only from the extracted evidence already provided, and state any limitation.'}];}}trace.push({stage:'Model fallback',status:'complete',detail:'A specialized model was unavailable; continuing with the configured default model and available extracted evidence.'});response=await sendToModel();}
    if(!response||!response.ok){console.error('NVIDIA Copilot request failed',{status:response?.status??(requestFailure instanceof Error?requestFailure.name:'unknown')});throw new WorkspaceError('Copilot could not reach its model service. Try again shortly.',503)}
    const body=await response.json() as {choices?:{message?:Message;finish_reason?:string}[]};const message=body.choices?.[0]?.message;if(!message)throw new WorkspaceError('Copilot returned an incomplete response. Try again.',503);
-   if(!message.tool_calls?.length){const answer=typeof message.content==='string'?message.content.trim():'';if(!answer)throw new WorkspaceError('Copilot returned an empty response. Try again.',503);if(recordQuestion.test(input.messages.at(-1)?.content??'')&&!toolLookupCount)throw new WorkspaceError('I couldn’t verify that from your organization’s records. Try including an invoice number, PO number, or vendor name.',503);trace.push({stage:'Answer',status:'complete',detail:toolLookupCount?'Response grounded in the active organization’s retrieved records.':'General product guidance; no organization record was accessed.'});return NextResponse.json({answer,trace,model},{headers:{'Cache-Control':'no-store'}})}
+   if(!message.tool_calls?.length){const answer=typeof message.content==='string'?message.content.trim():'';if(!answer)throw new WorkspaceError('Copilot returned an empty response. Try again.',503);if(requiresWorkspaceEvidence(input.messages.at(-1)?.content??'',Boolean(input.pageContext))&&!toolLookupCount)throw new WorkspaceError('I couldn’t verify that from your organization’s records. Try including an invoice number, PO number, or vendor name.',503);trace.push({stage:'Answer',status:'complete',detail:toolLookupCount?'Response grounded in the active organization’s retrieved records.':'General AP guidance; no organization record was accessed.'});return NextResponse.json({answer,trace,model},{headers:{'Cache-Control':'no-store'}})}
    if(message.tool_calls.length>3)throw new WorkspaceError('Copilot requested too many lookups at once. Try a more focused question.',400);
    messages.push(message);
    const calls=await Promise.all(message.tool_calls.map(async call=>{if(call.type!=='function')throw new WorkspaceError('Unsupported Copilot action.',400);let args:unknown;try{args=JSON.parse(call.function.arguments)}catch{throw new WorkspaceError('Copilot requested an invalid data lookup.',400)}const result=await executeTool(call.function.name,args,{...c,pageContext:input.pageContext});return {call,result}}));
