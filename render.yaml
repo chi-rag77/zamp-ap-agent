@@ -70,4 +70,4 @@ services:
       - key: AGENT_AUTO_TRIGGER
         value: "true"
       - key: AGENT_WORKER_SECRET
-        sync: false
+        generateValue: true
