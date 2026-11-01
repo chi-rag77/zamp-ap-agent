@@ -6,7 +6,9 @@ services:
     region: singapore
     branch: infra/render-migration
     autoDeployTrigger: commit
-    buildCommand: npm ci && npm run build
+    # Render may set NODE_ENV=production during builds; include TypeScript and
+    # React type packages explicitly because Next.js needs them to compile.
+    buildCommand: npm ci --include=dev && npm run build
     startCommand: npm start -- --hostname 0.0.0.0
     healthCheckPath: /health
     envVars:
