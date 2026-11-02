@@ -23,7 +23,15 @@ export function resolveVendor(claim:VendorClaim,existingVendorId:string|null,ven
     return {status:'MATCHED',vendorId:v.id,method,evidence:{matchedValue:method==='EXACT_NAME'?normalizeVendorName(v.name):method==='GSTIN'?gstin:taxId}};
   };
   if(gstin){const found=exact(active.filter(v=>v.gstin?.replace(/\s/g,'').toUpperCase()===gstin),'GSTIN');if(found)return found;return {status:'MISMATCH',method:'GSTIN',evidence:{gstin},reason:'Invoice GSTIN does not match any vendor master record'}}
-  if(taxId){const found=exact(active.filter(v=>v.taxId?.replace(/\s/g,'').toUpperCase()===taxId),'TAX_ID');if(found)return found;return {status:'MISMATCH',method:'TAX_ID',evidence:{taxId},reason:'Invoice tax ID does not match any vendor master record'}}
+  if(taxId){
+    const found=exact(active.filter(v=>v.taxId?.replace(/\s/g,'').toUpperCase()===taxId),'TAX_ID');
+    if(found)return found;
+    // Some invoice layouts label a vendor code as "Tax ID". Accept only an
+    // exact vendor-code match; never use fuzzy code matching for financial data.
+    const codeMatch=exact(active.filter(v=>v.vendorCode?.replace(/\s/g,'').toUpperCase()===taxId),'VENDOR_CODE');
+    if(codeMatch)return codeMatch;
+    return {status:'MISMATCH',method:'TAX_ID',evidence:{taxId},reason:'Invoice tax ID does not match any vendor master record or exact vendor code'}
+  }
   const normalized=normalizeVendorName(claim.name);
   if(normalized){const found=exact(active.filter(v=>normalizeVendorName(v.name)===normalized),'EXACT_NAME');if(found)return found}
   if(existingVendorId&&!gstin&&!taxId&&!normalized&&byId(existingVendorId))return {status:'MATCHED',vendorId:existingVendorId,method:'LINKED_ID',evidence:{existingVendorId}};
