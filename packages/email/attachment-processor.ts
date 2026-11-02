@@ -1,20 +1,42 @@
-import type {SupabaseClient} from '@supabase/supabase-js';
-import {GmailClient} from './gmail-client';
-import {downloadAttachment} from './attachment-downloader';
-import {validateAttachment,sanitizeFilename,maxAttachmentBytes} from './security';
-import {attachmentRole} from './email-classifier';
-import {findDuplicate} from './deduplicator';
-import {createEmailInvoice} from './invoice-creator';
-import {storeDocument,storeSupportingDocument} from './storage';
-import {EmailError} from './errors';
-import type {EmailAttachment,EmailMessage} from './types';
-export async function processAttachment(db:SupabaseClient,client:GmailClient,email:EmailMessage,intakeId:string,messageRowId:string,attachment:EmailAttachment,audit:(event:string,description:string,metadata?:Record<string,unknown>,invoiceId?:string)=>Promise<void>){const role=attachmentRole(attachment);const clean=sanitizeFilename(attachment.filename);const {data:record,error:insertError}=await db.from('email_attachments').upsert({email_message_id:messageRowId,email_intake_id:intakeId,attachment_id:attachment.attachmentId,filename:attachment.filename,sanitized_filename:clean,mime_type:attachment.mimeType,size_bytes:attachment.sizeBytes,document_role:role,storage_path:null},{onConflict:'email_message_id,attachment_id',ignoreDuplicates:true}).select('*').maybeSingle();if(insertError)throw insertError;const row=record??(await db.from('email_attachments').select('*').eq('email_message_id',messageRowId).eq('attachment_id',attachment.attachmentId).single()).data;if(!row)throw new Error('Attachment record missing');const id=row.id as string;if(row.document_role!==role){const roleUpdate=await db.from('email_attachments').update({document_role:role}).eq('id',id);if(roleUpdate.error)throw roleUpdate.error}await audit('ATTACHMENT_DISCOVERED',clean,{attachmentId:id,role});if(role==='IGNORE'){await db.from('email_attachments').update({document_status:'REJECTED',rejection_reason:'IGNORED_INLINE_OR_UNSUPPORTED'}).eq('id',id);return {kind:'ignored' as const}}
- if(role==='SUPPORTING_DOCUMENT'){
-  if(row.document_status==='STORED'&&row.storage_path)return {kind:'supporting' as const};
-  try{const bytes=await downloadAttachment(client,attachment);await audit('ATTACHMENT_DOWNLOADED',clean,{attachmentId:id,sizeBytes:bytes.length});const validated=validateAttachment(bytes,attachment.mimeType,clean);await audit('ATTACHMENT_VALIDATED',clean,{attachmentId:id,sha256:validated.sha256});const path=await storeSupportingDocument(db,{intakeId,attachmentRecordId:id,bytes,filename:clean,mimeType:validated.mimeType,hash:validated.sha256,extension:validated.extension});const updated=await db.from('email_attachments').update({document_status:'STORED',storage_path:path,document_hash:validated.sha256,processed:true}).eq('id',id);if(updated.error)throw updated.error;await audit('DOCUMENT_STORED',clean,{attachmentId:id,role:'SUPPORTING_DOCUMENT'});return {kind:'supporting' as const}}catch(error){await db.from('email_attachments').update({document_status:'FAILED',rejection_reason:error instanceof EmailError?error.code:'DOCUMENT_STORAGE_FAILED'}).eq('id',id);throw error}
- }
- if(row.document_status==='STORED'&&row.invoice_id)return {kind:'invoice' as const,invoiceId:row.invoice_id as string,bytes:null as Buffer|null,mimeType:row.mime_type as string,filename:clean,created:false};
- const {data:priorInvoice,error:priorError}=await db.from('invoices').select('id,document_path').eq('source_attachment_id',id).maybeSingle();if(priorError)throw priorError;if(priorInvoice?.document_path){const {data:stored,error:storedError}=await db.from('invoice_documents').select('id,filename,mime_type,size_bytes,document_hash,storage_bucket').eq('invoice_id',priorInvoice.id).eq('storage_path',priorInvoice.document_path).maybeSingle();if(storedError)throw storedError;if(stored&&stored.document_hash){const linked=await db.from('email_documents').upsert({email_intake_id:intakeId,email_attachment_id:id,invoice_id:priorInvoice.id,storage_bucket:stored.storage_bucket,storage_path:priorInvoice.document_path,filename:stored.filename,mime_type:stored.mime_type,size_bytes:stored.size_bytes,sha256:stored.document_hash,document_role:'INVOICE',status:'STORED'},{onConflict:'email_attachment_id'});if(linked.error)throw linked.error;await db.from('email_attachments').update({invoice_id:priorInvoice.id,storage_path:priorInvoice.document_path,document_hash:stored.document_hash,document_status:'STORED',processed:true}).eq('id',id);return {kind:'invoice' as const,invoiceId:priorInvoice.id as string,bytes:null as Buffer|null,mimeType:row.mime_type as string,filename:clean,created:false}}}
- try{if(attachment.sizeBytes>maxAttachmentBytes())throw new EmailError('ATTACHMENT_TOO_LARGE','Attachment exceeds size limit');const bytes=await downloadAttachment(client,attachment);await audit('ATTACHMENT_DOWNLOADED',clean,{attachmentId:id,sizeBytes:bytes.length});const validated=validateAttachment(bytes,attachment.mimeType,clean);await audit('ATTACHMENT_VALIDATED',clean,{attachmentId:id,sha256:validated.sha256});const duplicate=await findDuplicate(db,validated.sha256,id);if(duplicate){await db.from('email_attachments').update({document_hash:validated.sha256,document_status:'REJECTED',rejection_reason:'DUPLICATE_ATTACHMENT'}).eq('id',id);await audit('ATTACHMENT_DUPLICATE',clean,{attachmentId:id,existingInvoiceId:duplicate.invoice_id});return {kind:'duplicate' as const}}
- const claim=await db.from('email_attachments').update({document_hash:validated.sha256,document_status:'VALIDATED',rejection_reason:null}).eq('id',id);if(claim.error){if(claim.error.code==='23505'){await db.from('email_attachments').update({document_status:'REJECTED',rejection_reason:'DUPLICATE_ATTACHMENT'}).eq('id',id);await audit('ATTACHMENT_DUPLICATE',clean,{attachmentId:id});return {kind:'duplicate' as const}}throw claim.error}const invoiceId=await createEmailInvoice(db,{messageRowId,attachmentRowId:id,intakeId,receivedAt:email.receivedAt,hash:validated.sha256});const document=await storeDocument(db,{invoiceId,attachmentRecordId:id,intakeId,bytes,filename:clean,mimeType:validated.mimeType,hash:validated.sha256,extension:validated.extension});const {error:updateError}=await db.from('invoices').update({document_path:document.path,document_hash:validated.sha256}).eq('id',invoiceId);if(updateError)throw updateError;const {error:attachmentError}=await db.from('email_attachments').update({storage_path:document.path,document_hash:validated.sha256,document_status:'STORED',invoice_id:invoiceId,processed:true}).eq('id',id);if(attachmentError)throw attachmentError;await audit('DOCUMENT_STORED',clean,{attachmentId:id,documentId:document.id},invoiceId);await audit('INVOICE_CREATED_FROM_EMAIL',clean,{attachmentId:id},invoiceId);return {kind:'invoice' as const,invoiceId,bytes,mimeType:validated.mimeType,filename:clean,created:true}
- }catch(error){const code=error instanceof EmailError?error.code:'DOCUMENT_STORAGE_FAILED';await db.from('email_attachments').update({document_status:'FAILED',rejection_reason:code}).eq('id',id);throw error}}
+import {decideClassification} from './classification-decision';
+import {CLASSIFICATION_CONFIG,detectDocumentType,extractClassificationSignals} from './classification-signals';
+import type {ClassificationResult,DocumentAnalysis,EmailAttachment,EmailMessage} from './types';
+
+const SUPPORTED_DOCUMENT=/\.(pdf|png|jpe?g)$/i;
+const NON_INVOICE_FILENAME=/\b(quotation|quote|pro\s*forma|credit\s*note|credit\s*memo|debit\s*note|debit\s*memo|purchase\s*order|delivery\s*note|packing\s*list|goods\s*receipt|grn|statement\s*of\s*account|receipt)\b/i;
+
+export function attachmentRole(attachment:EmailAttachment):'INVOICE'|'SUPPORTING_DOCUMENT'|'IGNORE'{
+ const filename=attachment.filename??'';const name=filename.toLowerCase().replace(/[_-]+/g,' ');
+ if(/\b(logo|signature|avatar|icon)\b/.test(name))return 'IGNORE';
+ const invoiceNamed=/\b(invoice|inv(?:\s*\d+)?|bill)\b/.test(name);
+ if(attachment.inline&&attachment.mimeType.toLowerCase().startsWith('image/')&&!invoiceNamed)return 'IGNORE';
+ // File names are weak evidence: only obvious document-type labels classify a
+ // supporting document. A free-standing "po" token is never enough.
+ const startsWithPoReference=/^\s*po\s*[-#:]?\s*[a-z0-9]+/i.test(filename);
+ if(startsWithPoReference||NON_INVOICE_FILENAME.test(name))return 'SUPPORTING_DOCUMENT';
+ return 'INVOICE';
+}
+
+export function classifyEmail(email:EmailMessage,document?:DocumentAnalysis):ClassificationResult{
+ const supportedAttachments=email.attachments.filter(attachment=>attachmentRole(attachment)==='INVOICE'&&SUPPORTED_DOCUMENT.test(attachment.filename));
+ const unsupportedAttachmentCount=email.attachments.filter(attachment=>attachmentRole(attachment)==='INVOICE'&&!SUPPORTED_DOCUMENT.test(attachment.filename)).length;
+ const hasInvoiceIntent=/\b(tax\s+invoice|invoice|bill(?:ing)?|inv[-\s/#]?\d{2,})\b/i.test(`${email.subject??''} ${email.bodyText??''}`)||/^\s*inv\s*$/i.test(email.subject??'');
+ const {signals,documentType}=extractClassificationSignals(email,document);
+ if(email.attachments.some(attachment=>attachment.inline&&attachmentRole(attachment)==='IGNORE'))signals.push({source:'MIME',signal:'Decorative inline image ignored',weight:0});
+ const decision=decideClassification({signals,documentType,hasAttachments:email.attachments.length>0,supportedAttachmentCount:supportedAttachments.length,unsupportedAttachmentCount,hasInvoiceIntent});
+ const reasons=signals.map(signal=>`${signal.source}: ${signal.signal} (${signal.weight>=0?'+':''}${signal.weight})`);
+ if(email.attachments.length===0)reasons.push('No attachments were provided');
+ if(unsupportedAttachmentCount>0)reasons.push(`${unsupportedAttachmentCount} invoice candidate attachment(s) use an unsupported file type`);
+ if(decision.classification==='REVIEW_REQUIRED')reasons.push('Conflicting or insufficient evidence; route to human review');
+ if(decision.classification==='UNSUPPORTED')reasons.push('Invoice intent was detected but no supported document was attached');
+ if(decision.classification==='NON_INVOICE')reasons.push('Evidence does not indicate an invoice');
+ return {classification:decision.classification,confidence:decision.confidence,score:decision.score,documentType,signals,reasons,attachmentCount:email.attachments.length};
+}
+
+export function classifyDocumentContent(document:DocumentAnalysis){
+ const documentType=document.text?detectDocumentType(document.text):document.documentType??'UNKNOWN';
+ const hasMinimumInvoiceEvidence=Boolean(document.invoiceNumber&&document.totalAmount!=null);
+ const confidence=document.confidence??(documentType==='UNKNOWN'?0.4:hasMinimumInvoiceEvidence?0.9:0.65);
+ const classification=documentType==='INVOICE'&&hasMinimumInvoiceEvidence&&confidence>=CLASSIFICATION_CONFIG.thresholds.contentAutoInvoiceConfidence?'INVOICE':documentType==='UNKNOWN'?'REVIEW_REQUIRED':documentType==='INVOICE'?'REVIEW_REQUIRED':'NON_INVOICE';
+ return {documentType,classification,confidence,reasons:[documentType==='UNKNOWN'?'Document content does not identify a known financial document type':`Document content indicates ${documentType.toLowerCase().replaceAll('_',' ')}`,...(hasMinimumInvoiceEvidence?['Invoice identifier and total found in extracted document data']:[]),...(confidence<CLASSIFICATION_CONFIG.thresholds.contentAutoInvoiceConfidence?['Content confidence is below the configured safe-routing threshold']:[])]};
+}
