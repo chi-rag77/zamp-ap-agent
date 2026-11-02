@@ -26,10 +26,45 @@ export async function processEmailMessage(messageId:string,options:{client?:Gmai
  for(const attachment of storedAttachments??[])if(attachment.invoice_id)invoiceIds.push(attachment.invoice_id as string);
  const uniqueInvoiceIds=[...new Set(invoiceIds)];if(classification.classification==='REVIEW_REQUIRED'||classification.classification==='POSSIBLE_INVOICE'){for(const invoiceId of uniqueInvoiceIds)reviewInvoiceIds.add(invoiceId)}
  if(uniqueInvoiceIds.length){await db.from('email_intakes').update({invoice_id:uniqueInvoiceIds[0]}).eq('id',id)}
- for(const invoiceId of uniqueInvoiceIds){const {data:invoice,error:invoiceError}=await db.from('invoices').select('current_extraction_id,document_path').eq('id',invoiceId).single();if(invoiceError||!invoice)throw invoiceError??new Error('Invoice not found');if(!invoice.document_path){failed=true;result.errors.push('DOCUMENT_STORAGE_FAILED');continue}try{await stage('EXTRACTING');if(!invoice.current_extraction_id){const {data:file,error:fileError}=await db.storage.from(storageBucket()).download(invoice.document_path);if(fileError||!file)throw fileError??new Error('Stored document unavailable');const {data:document,error:documentError}=await db.from('invoice_documents').select('filename,mime_type').eq('invoice_id',invoiceId).limit(1).single();if(documentError)throw documentError;const provider=process.env.AI_PROVIDER==='mock'?new MockVisionProvider():new NvidiaVisionProvider();const extracted=await extractInvoiceDocument({db,provider,invoiceId,document:{bytes:Buffer.from(await file.arrayBuffer()),filename:document.filename,mimeType:document.mime_type}});const contentDecision=classifyDocumentContent({documentType:extracted.extraction.documentType==='NOT_INVOICE'?undefined:extracted.extraction.documentType,invoiceNumber:extracted.extraction.invoiceNumber,invoiceDate:extracted.extraction.invoiceDate,vendorName:extracted.extraction.vendor.name,totalAmount:extracted.extraction.total,confidence:extracted.metadata.overallConfidence});await audit('DOCUMENT_CLASSIFIED',contentDecision.classification,{documentType:contentDecision.documentType,confidence:contentDecision.confidence,reasons:contentDecision.reasons},invoiceId);if(contentDecision.classification==='INVOICE')reviewInvoiceIds.delete(invoiceId);else{reviewInvoiceIds.add(invoiceId);const reviewUpdate=await db.from('invoices').update({status:'NEEDS_REVIEW'}).eq('id',invoiceId);if(reviewUpdate.error)throw reviewUpdate.error}}
- if(contentDecision.classification==='INVOICE'){const classificationUpdate=await db.from('email_intakes').update({classification:'INVOICE',classification_confidence:contentDecision.confidence,classification_reasons:[...classification.reasons,...contentDecision.reasons]}).eq('id',id);if(classificationUpdate.error)throw classificationUpdate.error}
- if(!reviewInvoiceIds.has(invoiceId)&&options.autoRun!==false&&process.env.AGENT_AUTO_TRIGGER!=='false'){await stage('TRIGGERING_AGENT');const {data:latest,error:activeError}=await db.from('agent_runs').select('id,status').eq('invoice_id',invoiceId).order('created_at',{ascending:false}).limit(1).maybeSingle();if(activeError)throw activeError;if(!latest||!['QUEUED','RUNNING','WAITING','COMPLETED'].includes(latest.status)){const agent=await runAgent(invoiceId);result.agentRunsTriggered++;await db.from('email_attachments').update({agent_run_id:agent.runId}).eq('invoice_id',invoiceId);await audit('AGENT_TRIGGERED',`Agent run ${agent.runId}`,{runId:agent.runId,status:agent.status},invoiceId);if(agent.status==='FAILED')throw new EmailError('AGENT_TRIGGER_FAILED',agent.summary)}}
- }catch(error){failed=true;transientFailure=true;result.errors.push(error instanceof EmailError?error.code:'AGENT_OR_EXTRACTION_FAILED');await audit('EMAIL_PROCESSING_FAILED',error instanceof Error?error.message:'Downstream processing failed',{},invoiceId)}}
+ for(const invoiceId of uniqueInvoiceIds){
+  const {data:invoice,error:invoiceError}=await db.from('invoices').select('current_extraction_id,document_path').eq('id',invoiceId).single();
+  if(invoiceError||!invoice)throw invoiceError??new Error('Invoice not found');
+  if(!invoice.document_path){failed=true;result.errors.push('DOCUMENT_STORAGE_FAILED');continue}
+  try{
+   await stage('EXTRACTING');
+   if(!invoice.current_extraction_id){
+    const {data:file,error:fileError}=await db.storage.from(storageBucket()).download(invoice.document_path);
+    if(fileError||!file)throw fileError??new Error('Stored document unavailable');
+    const {data:document,error:documentError}=await db.from('invoice_documents').select('filename,mime_type').eq('invoice_id',invoiceId).limit(1).single();
+    if(documentError)throw documentError;
+    const provider=process.env.AI_PROVIDER==='mock'?new MockVisionProvider():new NvidiaVisionProvider();
+    const extracted=await extractInvoiceDocument({db,provider,invoiceId,document:{bytes:Buffer.from(await file.arrayBuffer()),filename:document.filename,mimeType:document.mime_type}});
+    const contentDecision=classifyDocumentContent({documentType:extracted.extraction.documentType==='NOT_INVOICE'?undefined:extracted.extraction.documentType,invoiceNumber:extracted.extraction.invoiceNumber,invoiceDate:extracted.extraction.invoiceDate,vendorName:extracted.extraction.vendor.name,totalAmount:extracted.extraction.total,confidence:extracted.metadata.overallConfidence});
+    await audit('DOCUMENT_CLASSIFIED',contentDecision.classification,{documentType:contentDecision.documentType,confidence:contentDecision.confidence,reasons:contentDecision.reasons},invoiceId);
+    if(contentDecision.classification==='INVOICE'){
+     reviewInvoiceIds.delete(invoiceId);
+     const classificationUpdate=await db.from('email_intakes').update({classification:'INVOICE',classification_confidence:contentDecision.confidence,classification_reasons:[...classification.reasons,...contentDecision.reasons]}).eq('id',id);
+     if(classificationUpdate.error)throw classificationUpdate.error;
+    }else{
+     reviewInvoiceIds.add(invoiceId);
+     const reviewUpdate=await db.from('invoices').update({status:'NEEDS_REVIEW'}).eq('id',invoiceId);
+     if(reviewUpdate.error)throw reviewUpdate.error;
+    }
+   }
+   if(!reviewInvoiceIds.has(invoiceId)&&options.autoRun!==false&&process.env.AGENT_AUTO_TRIGGER!=='false'){
+    await stage('TRIGGERING_AGENT');
+    const {data:latest,error:activeError}=await db.from('agent_runs').select('id,status').eq('invoice_id',invoiceId).order('created_at',{ascending:false}).limit(1).maybeSingle();
+    if(activeError)throw activeError;
+    if(!latest||!['QUEUED','RUNNING','WAITING','COMPLETED'].includes(latest.status)){
+     const agent=await runAgent(invoiceId);
+     result.agentRunsTriggered++;
+     await db.from('email_attachments').update({agent_run_id:agent.runId}).eq('invoice_id',invoiceId);
+     await audit('AGENT_TRIGGERED',`Agent run ${agent.runId}`,{runId:agent.runId,status:agent.status},invoiceId);
+     if(agent.status==='FAILED')throw new EmailError('AGENT_TRIGGER_FAILED',agent.summary);
+    }
+   }
+  }catch(error){failed=true;transientFailure=true;result.errors.push(error instanceof EmailError?error.code:'AGENT_OR_EXTRACTION_FAILED');await audit('EMAIL_PROCESSING_FAILED',error instanceof Error?error.message:'Downstream processing failed',{},invoiceId)}
+ }
  if(failed||result.unsupportedAttachments>0){result.status=transientFailure?'FAILED':'NEEDS_REVIEW';await finish(result.status,result.errors[0]??'EMAIL_PROCESSING_FAILED',result.errors.join(', '))}else if(uniqueInvoiceIds.length===0){result.status='NEEDS_REVIEW';await finish('NEEDS_REVIEW',result.duplicateAttachments?'DUPLICATE_ATTACHMENT':'NO_INVOICE_DOCUMENT',result.duplicateAttachments?'All invoice attachments were duplicates':'No invoice document was accepted')}else if(reviewInvoiceIds.size){result.status='NEEDS_REVIEW';for(const invoiceId of reviewInvoiceIds){const reviewUpdate=await db.from('invoices').update({status:'NEEDS_REVIEW'}).eq('id',invoiceId);if(reviewUpdate.error)throw reviewUpdate.error}const {error:classificationUpdateError}=await db.from('email_intakes').update({classification:'REVIEW_REQUIRED'}).eq('id',id);if(classificationUpdateError)throw classificationUpdateError;await finish('NEEDS_REVIEW','CLASSIFICATION_REVIEW_REQUIRED','Document evidence is ambiguous or incomplete; human review is required');await audit('EMAIL_CLASSIFICATION_REVIEW_REQUIRED','Invoice routed to human review',{invoiceIds:[...reviewInvoiceIds]})}else{result.status='PROCESSED';await finish('PROCESSED');await audit('EMAIL_PROCESSING_COMPLETED',`${uniqueInvoiceIds.length} invoice(s) processed`,{invoiceIds:uniqueInvoiceIds})}return result
  }catch(error){result.status='FAILED';const code=error instanceof EmailError?error.code:'EMAIL_PROCESSING_FAILED';result.errors.push(code);await finish('FAILED',code,error instanceof Error?error.message:'Email processing failed');await audit('EMAIL_PROCESSING_FAILED',code).catch(()=>{});return result}
  async function stage(value:string){const {error}=await db.from('email_intakes').update({stage:value}).eq('id',id);if(error)throw error}
