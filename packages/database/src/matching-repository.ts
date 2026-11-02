@@ -9,7 +9,7 @@ function checked<T>(data:T|null,error:{message:string}|null):T{if(error)throw ne
 function bounded<T>(data:T[]|null,count:number|null,error:{message:string}|null,name:string):T[]{const rows=checked(data,error);if((count??rows.length)>candidateLimit)throw new Error(`CANDIDATE_LIMIT: ${name} exceeds ${candidateLimit}`);return rows}
 const invoice=(v:Invoice):InvoiceRecord=>({id:v.id,number:v.invoice_number,vendorId:v.vendor_id,poId:v.po_id,currency:v.currency,date:v.invoice_date,receivedAt:v.received_at,subtotal:v.subtotal,tax:v.tax,total:v.total,documentHash:v.document_hash,archivedAt:v.archived_at,status:v.status});
 const line=(v:InvoiceLine):LineRecord=>({id:v.id,lineNumber:v.line_number,sku:v.sku,description:v.description,quantity:v.quantity,unitPrice:v.unit_price,taxRate:v.tax_rate,amount:v.amount});
-const vendor=(v:Vendor):VendorRecord=>({id:v.id,name:v.legal_name,gstin:v.gstin,taxId:v.tax_id,emailDomain:v.email_domain,status:v.status});
+const vendor=(v:Vendor):VendorRecord=>({id:v.id,name:v.legal_name,vendorCode:v.vendor_code,gstin:v.gstin,taxId:v.tax_id,emailDomain:v.email_domain,status:v.status});
 const po=(v:PurchaseOrder):PORecord=>({id:v.id,number:v.po_number,vendorId:v.vendor_id,currency:v.currency,status:v.status,poDate:v.po_date,total:v.total});
 const poLine=(v:PurchaseOrderLine)=>({id:v.id,poId:v.po_id,lineNumber:v.line_number,sku:v.sku,description:v.description,quantity:v.quantity,unitPrice:v.unit_price,taxRate:v.tax_rate,amount:v.amount});
 const object=(value:unknown):Record<string,unknown>|null=>value&&typeof value==='object'&&!Array.isArray(value)?value as Record<string,unknown>:null;

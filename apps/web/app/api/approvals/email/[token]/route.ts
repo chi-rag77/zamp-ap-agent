@@ -1,3 +1,4 @@
+import {hasTrustedOrigin} from '../../../../../lib/request-origin';
 import {NextRequest,NextResponse} from 'next/server';
 import {z} from 'zod';
 import {createServerClient} from '@zamp/database';
@@ -32,7 +33,7 @@ export async function GET(_request:NextRequest,{params}:{params:Promise<{token:s
 const bodySchema=z.object({decision:z.enum(['APPROVE','REJECT']),reason:z.string().trim().max(2000).default('')}).strict();
 export async function POST(request:NextRequest,{params}:{params:Promise<{token:string}>}){
  try{
-  if(request.headers.get('origin')!==request.nextUrl.origin)return fail('Request origin is not allowed.',403);
+  if(!hasTrustedOrigin(request))return fail('Request origin is not allowed.',403);
   const {token}=await params;if(!tokenSchema.safeParse(token).success)return fail('This email approval link is invalid or expired.',404);
   const input=bodySchema.parse(await request.json());
   const db=createServerClient(),tokenHash=approvalEmailTokenHash(token);

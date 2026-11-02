@@ -37,4 +37,9 @@ describe('serverless PDF preparation',()=>{
  it('enforces the configured page limit before rendering',async()=>{
   await expect(prepareDocument({bytes:pdfFixture(2),mimeType:'application/pdf',filename:'invoice.pdf'},{NODE_ENV:'test',MAX_INVOICE_PAGES:'1'})).rejects.toMatchObject({code:'DOCUMENT_TOO_LARGE'} satisfies Partial<DocumentError>);
  });
+ it('renders only the requested leading pages from a longer PDF',async()=>{
+  const result=await prepareDocument({bytes:pdfFixture(5),mimeType:'application/pdf',filename:'invoice.pdf'},{NODE_ENV:'test',MAX_INVOICE_PAGES:'20'},{pageLimit:3});
+  expect(result.pages).toHaveLength(3);
+  expect(result.pages.map(page=>page.pageNumber)).toEqual([1,2,3]);
+ });
 });

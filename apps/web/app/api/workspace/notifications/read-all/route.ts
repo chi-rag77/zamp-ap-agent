@@ -1,3 +1,4 @@
+import {hasTrustedOrigin} from '../../../../../lib/request-origin';
 import {NextRequest,NextResponse} from 'next/server';
 import {objectContext,WorkspaceError} from '../../../../../lib/objects';
 
@@ -5,7 +6,7 @@ export const runtime='nodejs';
 export const dynamic='force-dynamic';
 
 export async function POST(request:NextRequest){
-  if(request.headers.get('origin')!==request.nextUrl.origin){
+  if(!hasTrustedOrigin(request)){
     return NextResponse.json({error:'Request origin is not allowed.'},{status:403});
   }
   try{

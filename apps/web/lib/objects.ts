@@ -4,6 +4,7 @@ import {createServerClient} from '@zamp/database';
 import {createTenantDatabase} from './tenant-database';
 import {workosAuthConfigured} from './workos-auth';
 import {canConfigure,canWrite,emptyConfiguration,lineTables,tables,type ObjectType} from '../../../packages/objects/src/schema';
+import {rolePermissions} from './access-control';
 export class WorkspaceError extends Error {constructor(message:string,public status=400){super(message)}}
 export async function objectContext(){
  if(workosAuthConfigured()){
@@ -80,5 +81,6 @@ export async function objectDetail(c:ObjectContext,type:ObjectType,id:string){
  }
  let linkedPurchaseOrderLines:Record<string,unknown>[]=[];
  if(type==='goods_receipt'&&object.po_id){const linked=await c.db.from('purchase_order_lines').select('*').eq('organization_id',c.organizationId).eq('po_id',object.po_id).order('line_number').limit(500);if(linked.error)throw new WorkspaceError('Purchase-order lines could not be loaded.',503);linkedPurchaseOrderLines=linked.data??[]}
- return {object,type,lines:lines.data??[],linkedPurchaseOrderLines,fields:values.data,schema:schema.data,messages:messages.data??[],assignment:assignment.data,attachments:attachments.data??[],activity:activity.data??[],reactions:reactions.data??[],related,evidence,userId:c.userId,canEdit:canWrite(c.role),canConfigure:canConfigure(c.role)};
+ const permissions=await rolePermissions(c);
+ return {object,type,lines:lines.data??[],linkedPurchaseOrderLines,fields:values.data,schema:schema.data,messages:messages.data??[],assignment:assignment.data,attachments:attachments.data??[],activity:activity.data??[],reactions:reactions.data??[],related,evidence,userId:c.userId,canEdit:canWrite(c.role),canApprove:permissions.includes('invoices.approve'),canReject:permissions.includes('invoices.reject'),canConfigure:canConfigure(c.role)};
 }

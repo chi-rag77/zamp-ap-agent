@@ -11,7 +11,7 @@ export default async function PurchaseOrdersPage(){
   const workspace=await loadWorkspace('purchaseOrders',context.db);
   const purchaseOrders=workspace.purchaseOrders;
   const ids=new Set(purchaseOrders.map(po=>po.id));
-  const events=ids.size?await context.db.from('audit_events').select('actor_id,created_at,metadata').eq('organization_id',context.organizationId).contains('metadata',{objectType:'purchase_order'}).order('created_at',{ascending:false}).limit(1000):{data:[],error:null};
+  const events=ids.size?await context.db.from('audit_events').select('actor_id,metadata').eq('organization_id',context.organizationId).eq('metadata->>objectType','purchase_order').not('actor_id','is',null).in('metadata->>objectId',[...ids]).order('created_at',{ascending:true}).limit(500):{data:[],error:null};
   if(events.error)throw new WorkspaceError('Purchase-order creators could not be loaded.',503);
   const actorByPo=new Map<string,string>();
   for(const event of events.data??[]){

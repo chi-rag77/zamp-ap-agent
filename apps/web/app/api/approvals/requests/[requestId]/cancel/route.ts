@@ -1,3 +1,4 @@
+import {hasTrustedOrigin} from '../../../../../../lib/request-origin';
 import {NextRequest,NextResponse} from 'next/server';
 import {z} from 'zod';
 import {objectContext,WorkspaceError} from '../../../../../../lib/objects';
@@ -6,7 +7,7 @@ export const runtime='nodejs';export const dynamic='force-dynamic';
 const schema=z.object({expectedInvoiceUpdatedAt:z.iso.datetime({offset:true})}).strict();
 export async function POST(request:NextRequest,{params}:{params:Promise<{requestId:string}>}){
  try{
-  if(request.headers.get('origin')!==request.nextUrl.origin)throw new WorkspaceError('Request origin is not allowed.',403);
+  if(!hasTrustedOrigin(request))throw new WorkspaceError('Request origin is not allowed.',403);
   const c=await objectContext();await requirePermission(c,'invoices.edit');
   const {requestId}=await params;z.string().uuid().parse(requestId);const input=schema.parse(await request.json());
   const {data,error}=await c.db.rpc('cancel_invoice_approval_request',{p_org:c.organizationId,p_request:requestId,p_actor:c.userId,p_expected_invoice_updated_at:input.expectedInvoiceUpdatedAt});

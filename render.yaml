@@ -1,0 +1,73 @@
+services:
+  - type: web
+    name: zamp-ap-agent
+    runtime: node
+    plan: free
+    region: singapore
+    branch: infra/render-migration
+    autoDeployTrigger: commit
+    # Render may set NODE_ENV=production during builds; include TypeScript and
+    # React type packages explicitly because Next.js needs them to compile.
+    buildCommand: npm ci --include=dev && npm run build
+    startCommand: npm start -- --hostname 0.0.0.0
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_VERSION
+        value: 22.22.0
+      - key: NODE_ENV
+        value: production
+      - key: ZAMP_AUTH_REQUIRED
+        value: "true"
+      - key: NEXT_PUBLIC_SUPABASE_URL
+        sync: false
+      - key: NEXT_PUBLIC_SUPABASE_ANON_KEY
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: WORKOS_API_KEY
+        sync: false
+      - key: WORKOS_CLIENT_ID
+        sync: false
+      - key: WORKOS_COOKIE_PASSWORD
+        sync: false
+      - key: NEXT_PUBLIC_WORKOS_REDIRECT_URI
+        sync: false
+      - key: ZAMP_TENANT_ISOLATION_READY
+        sync: false
+      - key: NEXT_PUBLIC_APP_URL
+        fromService:
+          name: zamp-ap-agent
+          type: web
+          envVarKey: RENDER_EXTERNAL_URL
+      - key: NVIDIA_API_KEY
+        sync: false
+      - key: GMAIL_CLIENT_ID
+        sync: false
+      - key: GMAIL_CLIENT_SECRET
+        sync: false
+      - key: GMAIL_INVOICE_MAILBOX
+        sync: false
+      - key: GMAIL_REDIRECT_URI
+        sync: false
+      - key: GMAIL_PUBSUB_TOPIC
+        sync: false
+      - key: GMAIL_PUBSUB_AUDIENCE
+        sync: false
+      - key: GMAIL_PUBSUB_SERVICE_ACCOUNT
+        sync: false
+      - key: EMAIL_ADMIN_TOKEN
+        sync: false
+      - key: EMAIL_CRON_TOKEN
+        sync: false
+      - key: EMAIL_CRON_OIDC_AUDIENCE
+        value: https://zamp-ap-agent.onrender.com
+      - key: NVIDIA_MODEL
+        sync: false
+      - key: NVIDIA_COPILOT_MODEL
+        sync: false
+      - key: NVIDIA_BASE_URL
+        value: https://integrate.api.nvidia.com/v1
+      - key: AGENT_AUTO_TRIGGER
+        value: "true"
+      - key: AGENT_WORKER_SECRET
+        generateValue: true

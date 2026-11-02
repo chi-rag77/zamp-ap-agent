@@ -4,6 +4,7 @@ type VisionPage={pageNumber:number;mimeType:'image/png'|'image/jpeg';bytes:Buffe
 
 export type InvoiceDocumentInput={bytes:Buffer;mimeType:string;filename:string};
 export type PreparedDocument={pages:VisionPage[];mimeType:string;sizeBytes:number;text?:string};
+export type PrepareDocumentOptions={pageLimit?:number};
 const supported=new Set(['application/pdf','image/png','image/jpeg','image/jpg']);
 async function loadPdfParser(){
   // Some serverless Node runtimes do not expose DOMMatrix before pdf.js loads.
@@ -32,7 +33,7 @@ export function validateDocument(input:InvoiceDocumentInput,env:NodeJS.ProcessEn
   if(!actual||(mime==='image/jpg'?'image/jpeg':mime)!==actual)throw new DocumentError('DOCUMENT_CORRUPTED','Document content does not match its MIME type');
   return actual;
 }
-export async function prepareDocument(input:InvoiceDocumentInput,env:NodeJS.ProcessEnv=process.env):Promise<PreparedDocument>{
+export async function prepareDocument(input:InvoiceDocumentInput,env:NodeJS.ProcessEnv=process.env,options:PrepareDocumentOptions={}):Promise<PreparedDocument>{
   const mimeType=validateDocument(input,env);
   if(mimeType!=='application/pdf'){
     try{
@@ -48,16 +49,18 @@ export async function prepareDocument(input:InvoiceDocumentInput,env:NodeJS.Proc
   const parser=new PDFParse({data:input.bytes});
   try{
     let rendered;
-    try{rendered=await parser.getScreenshot({first:1,last:maxPages+1,desiredWidth:1240,imageBuffer:true,imageDataUrl:false})}
+    const pageLimit=options.pageLimit===undefined?maxPages:Math.max(1,Math.min(maxPages,Math.floor(options.pageLimit)));
+    try{rendered=await parser.getScreenshot({first:1,last:maxPages+1,...(options.pageLimit===undefined?{}:{partial:Array.from({length:pageLimit},(_,index)=>index+1)}),desiredWidth:1240,imageBuffer:true,imageDataUrl:false})}
     catch(error){console.error('Invoice PDF page rendering failed',error);throw new DocumentError('DOCUMENT_CORRUPTED','PDF pages could not be read')}
     const pages=rendered.total;
     if(!Number.isInteger(pages)||pages<1)throw new DocumentError('DOCUMENT_CORRUPTED','PDF page count cannot be read');
     if(pages>maxPages)throw new DocumentError('DOCUMENT_TOO_LARGE',`PDF has ${pages} pages; limit is ${maxPages}`);
-    if(rendered.pages.length!==pages||rendered.pages.some(page=>page.data.length===0))throw new DocumentError('PDF_RENDER_FAILED','Rendered page count differs from PDF page count');
+    const expectedRenderedPages=options.pageLimit===undefined?pages:Math.min(pages,pageLimit);
+    if(rendered.pages.length!==expectedRenderedPages||rendered.pages.some(page=>page.data.length===0))throw new DocumentError('PDF_RENDER_FAILED','Rendered page count differs from the requested page range');
     // Preserve the PDF text layer as a second signal for vision extraction.
     // Scanned PDFs continue to use their rendered page images as before.
     let text='';
-    try{text=(await parser.getText({first:1,last:maxPages})).text.trim().slice(0,24000)}catch(error){console.warn('Invoice PDF text extraction unavailable',error)}
+    try{text=(await parser.getText({first:1,last:expectedRenderedPages})).text.trim().slice(0,24000)}catch(error){console.warn('Invoice PDF text extraction unavailable',error)}
     return {pages:rendered.pages.map(page=>({pageNumber:page.pageNumber,mimeType:'image/png' as const,bytes:Buffer.from(page.data)})),mimeType,sizeBytes:input.bytes.length,...(text?{text}:{})};
   }finally{await parser.destroy().catch(()=>undefined)}
 }

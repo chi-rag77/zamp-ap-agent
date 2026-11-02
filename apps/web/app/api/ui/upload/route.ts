@@ -1,3 +1,4 @@
+import {hasTrustedOrigin} from '../../../../lib/request-origin';
 import {NextRequest,NextResponse} from 'next/server';
 import {createHash} from 'node:crypto';
 import {createServerClient} from '@zamp/database';
@@ -7,11 +8,14 @@ import {validateInvoice} from '@zamp/matching';
 import {localWorkspace} from '../../../../lib/data';
 import {createTenantDatabase} from '../../../../lib/tenant-database';
 import {workosAuthEnabled} from '../../../../lib/workos-auth';
+import {startAgentRun} from '@zamp/agent';
+import {dispatchAgentWorker} from '../../../../lib/agent-worker';
+import {after} from 'next/server';
 
 export const runtime='nodejs';
 export const maxDuration=300;
 export async function POST(request:NextRequest){
-  if(!localWorkspace()||request.headers.get('origin')!==request.nextUrl.origin)return NextResponse.json({error:'This upload is unavailable outside the connected workspace.'},{status:403});
+  if(!localWorkspace()||!hasTrustedOrigin(request))return NextResponse.json({error:'This upload is unavailable outside the connected workspace.'},{status:403});
   let invoiceId:string|undefined;
   try{
     const file=(await request.formData()).get('file');
@@ -36,7 +40,9 @@ export async function POST(request:NextRequest){
     const provider=process.env.AI_PROVIDER==='mock'?new MockVisionProvider():new NvidiaVisionProvider();
     await extractInvoiceDocument({db,provider,invoiceId:createdId,document:{bytes,mimeType:mime,filename:file.name}});
     const result=await validateInvoice(createdId);
-    return NextResponse.json({invoiceId:createdId,validationStatus:result.status});
+    const runId=await startAgentRun(createdId);
+    after(async()=>{await dispatchAgentWorker(request.nextUrl.origin)});
+    return NextResponse.json({invoiceId:createdId,validationStatus:result.status,agentRunId:runId,agentStatus:'QUEUED'});
   }catch(error){
     const message=error instanceof DocumentError?error.message:error instanceof Error?error.message:'Invoice processing failed';
     const status=error instanceof DocumentError?400:500;

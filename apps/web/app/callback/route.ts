@@ -1,8 +1,12 @@
 import {NextResponse,type NextRequest} from 'next/server';
 import {handleAuth} from '@workos-inc/authkit-nextjs';
-import {workosAuthEnabled} from '../../lib/workos-auth';
+import {workosAuthEnabled,workosRedirectUri} from '../../lib/workos-auth';
 
-const handleCallback=handleAuth({returnPathname:'/'});
+const publicCallbackUri=workosRedirectUri();
+const handleCallback=handleAuth({
+  ...(publicCallbackUri?{baseURL:new URL(publicCallbackUri).origin}:{}),
+  returnPathname:'/',
+});
 
 export async function GET(request:NextRequest){
   if(!workosAuthEnabled()){
