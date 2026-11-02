@@ -1,4 +1,4 @@
-import type {ClassificationSignal,DocumentAnalysis,DocumentType,EmailAttachment,EmailMessage} from './types';
+import type {ClassificationSignal,DocumentAnalysis,DocumentType,EmailMessage} from './types';
 
 export const CLASSIFICATION_CONFIG={
  thresholds:{invoice:65,possibleInvoice:35,nonInvoice:-25,contentAutoInvoiceConfidence:0.75},
