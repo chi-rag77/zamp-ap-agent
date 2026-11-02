@@ -58,6 +58,17 @@ describe('NVIDIA provider',()=>{
     });
     await new NvidiaVisionProvider({...config,model:'nvidia/nemotron-3-nano-omni-30b-a3b-reasoning'},fetcher as typeof fetch).extractInvoice(input);
   });
+  it('accepts null or omitted party fields and formatted INR amounts from model output',async()=>{
+    const fixtureInvoice=await fixture('perfect-invoice.json');
+    const invoice={...fixtureInvoice,vendor:null,buyer:null,shipTo:null,subtotal:'INR 25,000.00',tax:'INR 0.00',total:'INR 25,000.00',lineItems:fixtureInvoice.lineItems.map(line=>({...line,unitPrice:'INR 25,000.00',amount:'INR 25,000.00'}))};
+    const fetcher=vi.fn(async()=>new Response(JSON.stringify({choices:[{message:{content:JSON.stringify(invoice)},finish_reason:'stop'}]}),{status:200}));
+    const result=await new NvidiaVisionProvider(config,fetcher as typeof fetch).extractInvoice(input);
+    expect(result.extraction.vendor).toEqual({name:null,gstin:null,taxId:null,address:null});
+    expect(result.extraction.buyer).toEqual({name:null,taxId:null,address:null});
+    expect(result.extraction.shipTo).toEqual({name:null,taxId:null,address:null});
+    expect(result.extraction.total).toBe(25000);
+    expect(result.extraction.lineItems[0].unitPrice).toBe(25000);
+  });
   it('retries truncated output then fails closed',async()=>{
     const fetcher=vi.fn(async()=>new Response(JSON.stringify({choices:[{message:{content:'{}'},finish_reason:'length'}]}),{status:200}));
     await expect(new NvidiaVisionProvider(config,fetcher as typeof fetch).extractInvoice(input)).rejects.toMatchObject({code:'EXTRACTION_INCOMPLETE'});
