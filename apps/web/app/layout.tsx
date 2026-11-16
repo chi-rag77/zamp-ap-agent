@@ -11,6 +11,7 @@ import {AuthKitProvider} from '@workos-inc/authkit-nextjs/components';
 import {workosAuthEnabled} from '../lib/workos-auth';
 
 const inter=localFont({src:'../public/fonts/inter-latin.woff2',variable:'--font-inter',display:'swap',weight:'100 900'});
+const jakarta=localFont({src:'../public/fonts/plus-jakarta-sans-latin-variable.woff2',variable:'--font-jakarta',display:'swap',weight:'200 800'});
 
 export const metadata={title:'Zamp AP Agent — Accounts payable',description:'Invoice extraction, matching and validation workspace'};
 export default async function RootLayout({children}:Readonly<{children:React.ReactNode}>){
@@ -21,5 +22,5 @@ export default async function RootLayout({children}:Readonly<{children:React.Rea
   const environment=authEnabled?'WORKOS AUTHENTICATED':vercelWorkspaceEnabled()?'PROTECTED WORKSPACE':'LOCAL WORKSPACE';
   // Keep the shared shell independent from database health and event-cursor queries.
   // Those requests run after the first paint so a slow integration cannot stall every route.
-  return <html lang="en"><body className={inter.variable}><AuthKitProvider initialAuth={initialAuth}><Shell environment={environment} profile={profile}>{children}</Shell></AuthKitProvider></body></html>
+  return <html lang="en"><body className={`${inter.variable} ${jakarta.variable}`}><AuthKitProvider initialAuth={initialAuth}><Shell environment={environment} profile={profile}>{children}</Shell></AuthKitProvider></body></html>
 }
